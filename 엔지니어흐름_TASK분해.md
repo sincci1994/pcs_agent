@@ -31,7 +31,7 @@ x.xx  (2.11, 2.21, 3.31)                        = 판정  → GATE
 
 - 2.11 "Spec. In 여부 판정", 2.21 "작업 필요 여부 판정", 3.31 "작업 필요 여부 판정" — 세 개가 명시적 게이트다.
 - **4단계에는 명시적 게이트가 없지만**, 4.4의 "정상화 확인 → 최종 Close"가 실질적 게이트다. 이를 **G-05**로 분리 추출했다.
-- 즉 게이트는 원문 3개 + 추출 1개 = **4개**이며, 여기에 진입 판정(SBO 발행 조건, 1.3)을 **G-00**으로 추가하면 총 5개다.
+- 즉 게이트는 원문 3개 + 추출 1개 = **4개**이며, 여기에 진입 판정(SBO WO 자동 발행 조건, 1.3)을 **G-00**으로 추가하면 총 5개다.
 
 ### 1.2 4개 스테이지와 책임 이동
 
@@ -51,8 +51,8 @@ x.xx  (2.11, 2.21, 3.31)                        = 판정  → GATE
 | Track | 진입 조건 (원문) | 성격 | 진입 TASK |
 |---|---|---|---|
 | **TBM** | 부품 수명·고장 산포·Main설비 PM 주기 기반 주기 도래 (예: 3Way Valve 1년) | 시간 기반, 예방 | T-10 (누적 사용량 확인)부터 |
-| **CBM** | Warning Spec 초과 + 일정 시간 유지 (예: Inlet Press >770torr 5분) → SBO 자동발행 | 상태 기반, 예측 | T-04 |
-| **BM** | ALARM 발생 (예: H/J ERROR) → SBO 발생 | 고장 기반, 사후 | T-04 (긴급 플래그) |
+| **CBM** | Warning Spec 초과 + 일정 시간 유지 (예: Inlet Press >770torr 5분) → WO 자동 발행(SBO) | 상태 기반, 예측 | T-04 |
+| **BM** | ALARM 발생 (예: H/J ERROR) → WO 자동 발행(SBO) | 고장 기반, 사후 | T-04 (긴급 플래그) |
 
 **세 트랙은 동일한 후속 흐름(S2→S3→S4)을 공유하지만 우선순위와 시급성이 다르다.** Rule Engine은 케이스 생성 시점에 `trigger_type`을 반드시 기록해야 한다. 1.1에서 등급을 Warning / Alarm / **EMO** 3종으로 나눴는데, **EMO(비상정지) 트랙의 후속 흐름은 원문에 없다** → §10 Q1.
 
@@ -63,7 +63,7 @@ x.xx  (2.11, 2.21, 3.31)                        = 판정  → GATE
 | Actor | 원문상 책임 | 특징 |
 |---|---|---|
 | PCS기술팀 | 기준 수립(1.1~1.3), 종합 분석(3.1~3.3), 작업 승인(3.31), 결과 검증·Close(4.4) | 판단·의사결정 계층 |
-| 협력사 | 모니터링/SBO 수취(2.1), 현장 점검(2.2), 1차 판정(2.11/2.21), 작업 수행(4.2), 결과 입력(4.3) | 실행·1차 감지 계층 |
+| 협력사 | 모니터링/자동 WO 수취(2.1), 현장 점검(2.2), 1차 판정(2.11/2.21), 작업 수행(4.2), 결과 입력(4.3) | 실행·1차 감지 계층 |
 | PCS감독관 | Daily 체크리스트 점검 (2.1 명시) | 일상 점검 |
 | Main기술팀 | G-EMS WO 발행 (4.1) | WO 발행 권한 |
 
@@ -77,17 +77,18 @@ x.xx  (2.11, 2.21, 3.31)                        = 판정  → GATE
 | EES-SMAS | Daily Gas 사용량 → 누적 산출 | ○ |
 | TPSS | 가동률·생산량 | ○ |
 | G-EMS | WO 발행·이력·최근 PM 시점, 작업결과 입력, Qual, Close | ○ (읽기) / △ (쓰기) |
-| SBO | 사전감지 로직 등록, WO 자동발행 엔진 | △ (룰 등록) |
+| EES 내 SBO 로직 (System Based On) | 사전감지 조건 충족 시 **WO 자동 발행** — 별도 시스템이 아니라 EES에 등록된 로직이며, 발행된 WO는 G-EMS에서 확인·수취 | △ (룰 등록) |
 | ACS 2.0 | Warning/Alarm 메시지 실시간 수신 채널 | ○ (이벤트 인입) |
 
 ### 1.5 전체 흐름 (TASK/GATE 기준)
 
 ```text
 [TBM 주기 도래]────────────────────────────────┐
-[CBM Warning 지속]──G-00──▶ SBO 자동발행 ───┐   │
-[BM Alarm 발생]─────G-00──▶ SBO 발생 ───────┤   │
+[CBM Warning 지속]──G-00──▶ WO 자동발행(SBO) ┐   │
+[BM Alarm 발생]─────G-00──▶ WO 자동발행(SBO) ┤   │
                                             ▼   │
-                            T-04 모니터링·SBO 수취 │
+                            T-04 모니터링·자동 WO 수취
+                            (명확 케이스는 T-13 조치 직행? → 확인 필요)
                             T-05 Daily 점검      │
                                      │          │
                                   ┌─ G-01 Spec In 여부 ─ In ─▶ 관찰 등록 / 종료
@@ -190,10 +191,10 @@ Agent역할: 자동화 등급 + 구체적 기여
 | **S1. 기준 수립** | | | | | |
 | T-01 | 감지 Parameter · Spec 정의 | 1.1 | PCS기술팀 | EES | L-S |
 | T-02 | 고장 이력 분석 · TBM 주기 산정 | 1.2 | PCS기술팀 | G-EMS, EES | L-B |
-| T-03 | SBO 사전감지 로직 등록 | 1.3 | PCS기술팀 | SBO | L-S |
-| G-00 | SBO 발행 판정 | 1.3 | SYSTEM | SBO | L-A |
+| T-03 | SBO 사전감지 로직 등록 | 1.3 | PCS기술팀 | EES (SBO 로직) | L-S |
+| G-00 | SBO 판정 · WO 자동 발행 | 1.3 | SYSTEM(EES) | EES (SBO 로직) | L-A |
 | **S2. 감지·1차 확인** | | | | | |
-| T-04 | Warning/Alarm 수신 · SBO 수취 | 2.1 | 협력사 | ACS 2.0, EES, G-EMS | L-A |
+| T-04 | Warning/Alarm 수신 · 자동 WO 수취 | 2.1 | 협력사 | ACS 2.0, EES, G-EMS | L-A |
 | T-05 | Daily 체크리스트 점검 | 2.1 | PCS감독관 | (체크리스트) | L-C |
 | G-01 | Spec In 여부 판정 | 2.11 | 협력사 | EES | L-A |
 | T-06 | Scrubber 설비 현장 점검 | 2.2 | 협력사 | (육안·측정) | L-C |
@@ -208,11 +209,11 @@ Agent역할: 자동화 등급 + 구체적 기여
 | G-04 | 작업 필요 여부 · 우선순위 판정 | 3.31 | PCS기술팀 | — | L-B |
 | **S4. 조치·검증** | | | | | |
 | T-12 | WO 발행 | 4.1 | Main기술팀 | G-EMS | L-B |
-| T-13 | WO 수취 | 4.1 | 협력사 | G-EMS, SBO | L-A |
+| T-13 | WO 수취 | 4.1 | 협력사 | G-EMS | L-A |
 | T-14 | 현장 조치 작업 수행 | 4.2 | 협력사 | (SOP) | L-C |
 | T-15 | 작업 결과 입력 · Qual | 4.3 | 협력사 | G-EMS, EES | L-C + L-A |
 | G-05 | 정상화 검증 | 4.4 | PCS기술팀 | EES | L-A |
-| T-16 | WO Close · SBO 로직 튜닝 | 4.4 | PCS기술팀 | G-EMS, SBO | L-B |
+| T-16 | WO Close · SBO 로직 튜닝 | 4.4 | PCS기술팀 | G-EMS, EES (SBO 로직) | L-B |
 
 **총 16 TASK + 5 GATE.** 자동화 등급 분포: L-A 9, L-B 6, L-C 5, L-S 2 (T-15는 중복 계상).
 
@@ -241,24 +242,24 @@ Agent역할: 자동화 등급 + 구체적 기여
 #### T-03 · SBO 사전감지 로직 등록 (원문 1.3)
 - **Actor** PCS기술팀 / **Trigger** T-01·T-02 완료 또는 T-16 피드백
 - **Input** T-01의 `param_spec`, T-02의 `tbm_cycle`
-- **Logic** Parameter + 임계값 + 유지시간 + 등급 조합을 SBO 발행 조건으로 등록
+- **Logic** Parameter + 임계값 + 유지시간 + 등급 조합을 WO 자동 발행(SBO) 조건으로 등록
 - **Output** `sbo_rule[]` = {param, operator, threshold, duration, trigger_type, action}
 - **Agent역할 (L-S)** 룰 등록문 초안 생성, 기존 룰과 중복·상충 검사, 변경 이력 관리
 
-#### G-00 · SBO 발행 판정 (원문 1.3) — **결정표는 §6.1**
-- **Actor** SYSTEM(SBO) / **Trigger** 상시 스트림
-- **Output** CASE 생성 (`case_id`, `trigger_type`, `grade`, `target`, `param`, `detected_at`)
+#### G-00 · SBO 판정 · WO 자동 발행 (원문 1.3) — **결정표는 §6.1**
+- **Actor** SYSTEM(EES · SBO 로직) / **Trigger** 상시 스트림
+- **Output** WO 자동 발행 (`wo_source=SBO_AUTO`, G-EMS에서 확인·수취) + CASE 생성 (`case_id`, `trigger_type`, `grade`, `target`, `param`, `detected_at`)
 
 ---
 
 ### S2. 감지·1차 확인
 
-#### T-04 · Warning/Alarm 수신 · SBO 수취 (원문 2.1)
+#### T-04 · Warning/Alarm 수신 · 자동 WO 수취 (원문 2.1)
 - **Actor** 협력사 / **Trigger** G-00 발행 또는 ACS 2.0 메시지 수신
-- **Input** ACS 2.0 (EES 발행 Warning/Alarm 실시간), G-EMS (자동 발행 SBO 리스트)
-- **Logic** ① 메시지 실시간 수신 → ② G-EMS에서 SBO 리스트 확인·수취
+- **Input** ACS 2.0 (EES 발행 Warning/Alarm 실시간), G-EMS (SBO 로직이 자동 발행한 WO 리스트)
+- **Logic** ① 메시지 실시간 수신 → ② G-EMS에서 자동 발행 WO 확인·수취
 - **Output** `case_received_at`, `wo_source=SBO_AUTO`
-- **Agent역할 (L-A)** 미수취 SBO 잔량 감시, 등급·경과시간순 정렬, 담당 협력사 라우팅
+- **Agent역할 (L-A)** 미수취 자동 WO 잔량 감시, 등급·경과시간순 정렬, 담당 협력사 라우팅
 
 #### T-05 · Daily 체크리스트 점검 (원문 2.1)
 - **Actor** PCS감독관 / **Trigger** 일 1회 스케줄
@@ -367,13 +368,13 @@ Agent역할: 자동화 등급 + 구체적 기여
 
 > 룰 ID `R-xx`. `[확보]` = 원문에 근거 있음, `[미정]` = 워크숍 확정 필요.
 
-### 6.1 G-00 · SBO 발행 판정 (원문 1.3)
+### 6.1 G-00 · SBO 판정 · WO 자동 발행 (원문 1.3)
 
 | Rule | 조건 | 결과 | 근거 |
 |---|---|---|---|
-| **R-01** | Parameter 값 > Warning Spec **AND** 초과 상태 지속시간 ≥ 유지시간 | SBO 발행, `trigger_type=CBM` | `[확보]` "Warning Spec 초과 + 일정 시간 유지 시 WO 자동 발행" |
-| R-01a | Inlet Press > **770 torr** AND 유지 ≥ **5분** | SBO 발행 (R-01 인스턴스) | `[확보]` 원문 예시 |
-| **R-02** | ALARM 발생 (예: H/J ERROR) | SBO 발생, `trigger_type=BM` | `[확보]` 원문 예시 |
+| **R-01** | Parameter 값 > Warning Spec **AND** 초과 상태 지속시간 ≥ 유지시간 | WO 자동 발행, `trigger_type=CBM` | `[확보]` "Warning Spec 초과 + 일정 시간 유지 시 WO 자동 발행" |
+| R-01a | Inlet Press > **770 torr** AND 유지 ≥ **5분** | WO 자동 발행 (R-01 인스턴스) | `[확보]` 원문 예시 |
+| **R-02** | ALARM 발생 (예: H/J ERROR) | WO 자동 발행, `trigger_type=BM` | `[확보]` 원문 예시 |
 | **R-03** | TBM 주기 도래 (예: 3Way Valve 경과 ≥ 1년) | 계획 케이스 생성, `trigger_type=TBM` | `[확보]` 원문 1.2. **단, 원문에 SBO 발행 여부 명시 없음** → §10 Q5 |
 | R-04 | `grade = EMO` | **원문에 후속 경로 없음** | `[미정]` → §10 Q1 |
 
@@ -493,7 +494,7 @@ TASK를 실행하려면 Agent에게 아래 Tool이 필요하다. TASK → Tool �
 | `get_param_spec` | (model, param?) → Spec·등급 | T-01, G-01 |
 | `get_sensor_trend` | (target, param, period) → 시계열 | T-02, T-08, G-05 |
 | `get_alarm_history` | (target, period) → 알람 이벤트 목록·빈도 | T-02, G-01 |
-| `list_sbo` | (status, period) → SBO/WO 리스트 | T-04, T-13 |
+| `list_sbo` | (status, period) → SBO 로직 자동 발행 WO 리스트 | T-04, T-13 |
 | `get_wo_history` | (target) → WO 이력, 최근 PM 일자 | T-02, T-10 |
 | `get_gas_usage` | (target, from, to) → Daily 사용량, 누적 합산 | T-10 |
 | `get_production` | (target, period) → 가동률·생산량 | T-11 |
@@ -514,7 +515,7 @@ TASK를 실행하려면 Agent에게 아래 Tool이 필요하다. TASK → Tool �
 
 | 기획서 사고흐름 | 대응 TASK/GATE |
 |---|---|
-| 1. 어떤 라인/공정/설비를 볼 것인가 | T-04 (SBO가 대상을 지정) |
+| 1. 어떤 라인/공정/설비를 볼 것인가 | T-04 (자동 WO가 대상을 지정) |
 | 2. Chamber/Pump/Scrubber 연결구조 | T-09 |
 | 3. 배기 경로 NOR/BYP, Pair 상태 | T-07 (S-S/Allbypass 점검) |
 | 4. 어떤 Material/Precursor 사용 | T-10 (원문은 Gas 사용량으로만 표현) |
@@ -584,7 +585,7 @@ TASK화 과정에서 드러난 **원문만으로는 룰을 완성할 수 없는 
 | **Q12** | 소모품별 설계 수명이 **Gas 사용량 기준**으로 관리되는가, 기간 기준인가? | R-15, U-06 |
 | **Q13** | **모순 확인**: 3.31에서 PCS기술팀이 "최종 결정"하는데 4.1에서 WO는 Main기술팀이 발행한다. 승인 주체와 발행 주체가 분리된 것이 맞는가? Agent 답변은 어느 주체를 대상으로 하는가? | G-04, T-12 |
 | **Q14** | SMAS 사용량이 Gas 단위인가 Material/Precursor 단위인가? Chamber별 분해가 되는가? | T-10 |
-| **Q15** | **표기 혼재**: 3.2의 "EMS의 최근 PM 작업 이력"은 G-EMS를 의미하는가? SBO는 EES가 발행하는데 확인은 G-EMS로 하는 이유(시스템 간 연계 방식)는? | T-04, T-10 |
+| **Q15** | **표기 혼재**: 3.2의 "EMS의 최근 PM 작업 이력"은 G-EMS를 의미하는가? **(확정)** SBO는 EES 내 System Based On 로직이며 발행물은 WO이므로 WO 관리 시스템인 G-EMS에서 확인·수취한다. 잔여 확인: EES→G-EMS 연계(인터페이스) 방식 | T-04, T-10 |
 
 ---
 

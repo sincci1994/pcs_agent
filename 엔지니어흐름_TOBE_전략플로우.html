@@ -1,0 +1,1255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PCS TO-BE 전략 Flow — 감시는 Agent, 기준은 엔지니어</title>
+  <style>
+    :root {
+      --bg: #f4f4f5;
+      --ink: #1c1c21;
+      --muted: #63636b;
+      --line: #2b2b31;
+      --border: #d4d4d8;
+      --border-soft: #e4e4e7;
+      --pain: #c22a2a;
+      --pending: #71717a;
+      --ai: #2458d6;
+      --ai-soft: #eef3fd;
+      --shadow: 0 8px 22px rgba(24, 24, 28, 0.06);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+      line-height: 1.5;
+    }
+
+    button { font: inherit; }
+
+    .shell {
+      width: min(1880px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 2.2vw, 38px);
+      line-height: 1.18;
+      letter-spacing: -.035em;
+    }
+
+    h1 b { color: var(--ai); }
+
+    .subtitle {
+      max-width: 1020px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .page-nav { margin: 10px 0 0; font-size: 12px; }
+    .page-nav a {
+      color: #3f3f46;
+      font-weight: 800;
+      text-decoration: none;
+      border-bottom: 1.5px solid #3f3f46;
+      padding-bottom: 1px;
+    }
+    .page-nav a:hover { color: var(--ai); border-color: var(--ai); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .toolbar button {
+      min-height: 38px;
+      padding: 8px 13px;
+      color: #3f3f46;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .toolbar button:hover { border-color: #a1a1aa; }
+    .toolbar button[aria-pressed="true"] { color: #fff; background: #26262b; border-color: #26262b; }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 10px 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .status-item strong { font-size: 19px; }
+    .status-item span { color: var(--muted); font-size: 12px; }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #52525b;
+    }
+
+    .status-item.ai .status-dot { background: var(--ai); }
+
+    .board-wrap {
+      overflow-x: auto;
+      padding: 2px 2px 12px;
+      scrollbar-color: #a1a1aa transparent;
+    }
+
+    /* row 1 = Agent 감시 루프 4열, row 2 = 엔지니어 기준 루프 밴드. 열 사이 44px = 통로 */
+    .process-board {
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(330px, 1fr));
+      gap: 0 44px;
+      min-width: 1460px;
+      padding: 0 0 26px;
+    }
+
+    .connector-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .connector-casing {
+      fill: none;
+      stroke: #fff;
+      stroke-width: 6;
+      opacity: .92;
+    }
+
+    .connector-path {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 2;
+      marker-end: url(#arrow);
+    }
+
+    .connector-path.auto, .connector-path.autoloop { stroke: var(--ai); marker-end: url(#arrow-ai); }
+    .connector-path.loop, .connector-path.autoloop { stroke-dasharray: 8 5; }
+    .connector-path.pending { stroke: #9b9ba1; stroke-dasharray: 2 4; stroke-linecap: round; marker-end: url(#arrow-pending); }
+
+    .connector-label rect { fill: #fff; stroke: #c9c9cf; rx: 6; ry: 6; }
+
+    .connector-label text {
+      fill: var(--line);
+      font-size: 11px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    .connector-label.auto text, .connector-label.autoloop text { fill: var(--ai); }
+    .connector-label.auto rect, .connector-label.autoloop rect { stroke: #b9cbf2; }
+    .connector-label.pending text { fill: var(--pending); }
+
+    .stage {
+      position: relative;
+      z-index: 2;
+      min-height: 100%;
+      overflow: hidden;
+      background: #fdfdfd;
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--ai);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .stage-head {
+      position: relative;
+      z-index: 4;
+      min-height: 104px;
+      padding: 14px 16px 12px;
+      background: #f7f7f8;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .stage-kicker {
+      display: inline-flex;
+      margin-bottom: 6px;
+      padding: 2px 8px;
+      color: var(--ai);
+      background: #fff;
+      border: 1px solid #c4d2ef;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .stage-title { margin: 0; font-size: 20px; line-height: 1.2; letter-spacing: -.025em; }
+
+    .stage-desc { margin: 5px 0 0; color: var(--muted); font-size: 11.5px; }
+
+    .stage-body {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      padding: 18px 15px 26px;
+    }
+
+    .step { position: relative; z-index: 5; display: flex; flex-direction: column; }
+    .step > .flow-node { flex: 1 1 auto; }
+
+    /* TASK 카드: 좌상단 번호+주체 / 중앙 명칭 / 하단 기술 */
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      min-height: 92px;
+      padding: 10px 12px 9px;
+      background: #fff;
+      border: 1.5px solid #3f3f46;
+      border-radius: 11px;
+      box-shadow: 0 4px 12px rgba(24,24,28,.05);
+    }
+
+    /* Agent 수행 위젯 = 파란 포인트 */
+    .flow-node.ai { border-left: 5px solid var(--ai); }
+    .flow-node.ai .task-no { border-color: var(--ai); color: var(--ai); }
+
+    .node-top { display: flex; align-items: center; gap: 7px; }
+
+    .task-no {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 8px;
+      border: 1.5px solid #26262b;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+
+    .actor {
+      padding: 2px 7px;
+      color: #3f3f46;
+      background: #f4f4f5;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .actor.ai { color: #fff; background: var(--ai); }
+
+    .node-title {
+      margin: 7px 6px;
+      font-size: 13.5px;
+      font-weight: 850;
+      line-height: 1.32;
+      letter-spacing: -.015em;
+      text-align: center;
+      word-break: keep-all;
+    }
+
+    .node-tools {
+      margin-top: auto;
+      padding-top: 6px;
+      border-top: 1px dashed var(--border-soft);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .node-tools b {
+      margin-right: 6px;
+      color: #9b9ba1;
+      font-size: 8.5px;
+      font-weight: 900;
+      letter-spacing: .1em;
+    }
+
+    .flow-node.ai .node-tools b { color: #8aa4dd; }
+
+    /* GATE: 마름모 판단 위젯 */
+    .gate {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      min-height: 106px;
+      background: #26262b;
+      clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    }
+
+    .gate.ai { background: var(--ai); }
+
+    .gate::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      background: #fff;
+      clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    }
+
+    .gate-inner {
+      position: relative;
+      display: grid;
+      gap: 3px;
+      justify-items: center;
+      width: 62%;
+      text-align: center;
+    }
+
+    .gate-no { color: var(--muted); font-size: 9.5px; font-weight: 900; letter-spacing: .05em; }
+    .gate.ai .gate-no { color: var(--ai); }
+
+    .gate-title {
+      font-size: 12.5px;
+      font-weight: 850;
+      line-height: 1.25;
+      letter-spacing: -.015em;
+      word-break: keep-all;
+    }
+
+    .gate-tool { color: var(--muted); font-size: 9.5px; font-weight: 700; }
+
+    /* 위젯 밖 주석: ✓ 해소(파랑) / ? 확정 필요(회색) / ◦ 원칙(회색) */
+    .node-notes {
+      margin: 5px 2px 0 auto;
+      max-width: 46%;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: right;
+      word-break: keep-all;
+    }
+
+    .gate-step { position: relative; }
+    .gate-step > .node-notes {
+      position: absolute;
+      top: 0;
+      right: 2px;
+      margin: 0;
+      max-width: 32%;
+      z-index: 6;
+    }
+
+    .gain-note { display: block; color: var(--ai); }
+    .gain-note::before { content: "✓ "; font-weight: 900; }
+    .pending-note { display: block; color: var(--pending); }
+    .pending-note::before { content: "? "; font-weight: 900; }
+    .guard-note { display: block; color: var(--pending); font-weight: 600; }
+    .guard-note::before { content: "◦ "; }
+
+    .parallel-grid {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1.08fr .92fr;
+      gap: 9px;
+    }
+
+    .parallel-label {
+      position: absolute;
+      top: -13px;
+      right: 6px;
+      color: var(--muted);
+      background: #fdfdfd;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .terminal {
+      position: relative;
+      z-index: 5;
+      min-height: 46px;
+      padding: 9px 11px;
+      color: #3f3f46;
+      background: #fafafa;
+      border: 1.5px dashed #a1a1aa;
+      border-radius: 11px;
+      font-size: 11px;
+      font-weight: 800;
+      text-align: center;
+      word-break: keep-all;
+    }
+
+    .terminal small { color: var(--pending); font-weight: 700; }
+    .terminal.side { width: 71%; margin-left: auto; }
+
+    /* 하단 밴드: 엔지니어 기준 루프 (우→좌 흐름) */
+    .loop-band {
+      position: relative;
+      z-index: 2;
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(330px, 1fr));
+      gap: 44px;
+      margin-top: 76px;
+    }
+
+    .loop-band::before {
+      content: "";
+      position: absolute;
+      inset: -36px 0 -14px;
+      border: 1.5px dashed #a1a1aa;
+      border-radius: 14px;
+      pointer-events: none;
+    }
+
+    .loop-title {
+      position: absolute;
+      top: -28px;
+      left: 2px;
+      color: #3f3f46;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .04em;
+    }
+
+    .loop-title small { color: var(--muted); font-weight: 700; }
+
+    .loop-band .step { z-index: 5; }
+
+    .loop-band .flow-node { min-height: 72px; }
+    .loop-band .node-title { margin: 5px 4px; font-size: 12.5px; }
+    .loop-band .node-tools { font-size: 9.5px; padding-top: 4px; }
+
+    /* Pain → 전략 매핑 */
+    .map-title { margin: 26px 0 10px; font-size: 16px; letter-spacing: -.02em; }
+
+    .pain-map {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .pain-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 13px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 11px;
+      word-break: keep-all;
+    }
+
+    .pain-card .asis { color: var(--pain); font-weight: 800; line-height: 1.45; }
+    .pain-card .asis::before { content: "! AS-IS  "; font-size: 9px; letter-spacing: .06em; }
+    .pain-card .arrow { color: #a1a1aa; font-weight: 900; text-align: center; line-height: 1; }
+    .pain-card .tobe { color: var(--ai); font-weight: 800; line-height: 1.45; }
+    .pain-card .tobe::before { content: "✓ TO-BE  "; font-size: 9px; letter-spacing: .06em; }
+
+    .tech-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: auto; padding-top: 4px; }
+
+    .tech-tag {
+      padding: 2px 7px;
+      color: var(--ai);
+      background: var(--ai-soft);
+      border-radius: 5px;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    /* 판단 체계 요약 */
+    .judge-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 26px;
+      margin-top: 12px;
+    }
+
+    .judge-box {
+      position: relative;
+      padding: 11px 13px;
+      background: #fff;
+      border: 1.5px solid #3f3f46;
+      border-radius: 12px;
+      font-size: 10.5px;
+      word-break: keep-all;
+    }
+
+    .judge-box:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -21px;
+      transform: translateY(-50%);
+      color: #52525b;
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .judge-box h3 { margin: 0 0 6px; font-size: 12px; letter-spacing: -.01em; }
+    .judge-box h3 small { margin-left: 5px; color: var(--muted); font-weight: 800; font-size: 9px; }
+    .judge-box ul { margin: 0; padding: 0; list-style: none; color: #52525b; display: grid; gap: 2.5px; }
+    .judge-box li b { color: var(--ink); font-weight: 850; margin-right: 4px; }
+
+    .state-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+
+    .state-badge {
+      padding: 2px 7px;
+      border: 1px solid #a1a1aa;
+      border-radius: 999px;
+      color: #3f3f46;
+      font-size: 9.5px;
+      font-weight: 800;
+    }
+
+    .state-badge.hot { border-color: #3f3f46; background: #26262b; color: #fff; }
+
+    /* J-매트릭스 상세표 */
+    .j-table-wrap {
+      margin-top: 12px;
+      overflow-x: auto;
+      background: #fff;
+      border: 1.5px solid #3f3f46;
+      border-radius: 12px;
+    }
+
+    .j-table {
+      width: 100%;
+      min-width: 1000px;
+      border-collapse: collapse;
+      font-size: 11px;
+      word-break: keep-all;
+    }
+
+    .j-table th:nth-child(2) { width: 34%; }
+    .j-table th:nth-child(4) { width: 26%; }
+
+    .j-cond { margin: 0 0 4px; color: var(--ink); font-weight: 700; }
+
+    .j-formula {
+      color: var(--muted);
+      font-size: 9.5px;
+      font-weight: 700;
+    }
+
+    .j-table th {
+      padding: 8px 12px;
+      color: #3f3f46;
+      background: #f7f7f8;
+      border-bottom: 1.5px solid #3f3f46;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .03em;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    .j-table td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border-soft);
+      color: #3f3f46;
+      vertical-align: top;
+      line-height: 1.5;
+    }
+
+    .j-table tr:last-child td { border-bottom: none; }
+    .j-table td b { color: var(--ai); font-weight: 900; }
+
+    .j-id {
+      display: inline-block;
+      padding: 0 7px;
+      border: 1.5px solid var(--ai);
+      border-radius: 6px;
+      color: var(--ai);
+      font-size: 10px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .j-table .state-badge { white-space: nowrap; }
+    .j-table .state-none { color: var(--pending); font-size: 10px; font-weight: 800; white-space: nowrap; }
+
+    .j-foot { margin: 8px 2px 0; color: var(--muted); font-size: 10.5px; word-break: keep-all; }
+
+    .guardrail {
+      margin-top: 12px;
+      padding: 11px 15px;
+      background: #fff;
+      border: 1.5px solid #3f3f46;
+      border-left-width: 5px;
+      border-radius: 12px;
+      color: #3f3f46;
+      font-size: 11.5px;
+      font-weight: 700;
+      word-break: keep-all;
+    }
+
+    .guardrail b { font-weight: 900; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: center;
+      margin-top: 14px;
+      padding: 12px 15px;
+      color: #52525b;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 10px;
+    }
+
+    .legend strong { color: var(--ink); }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 23px; height: 13px; background: #fff; border: 1.5px solid #3f3f46; border-radius: 3px; }
+    .legend-swatch.ai { border-left: 4px solid var(--ai); }
+    .legend-diamond { width: 11px; height: 11px; margin: 0 5px; background: #fff; border: 1.5px solid #26262b; transform: rotate(45deg); }
+    .legend-line { width: 27px; border-top: 2px solid var(--line); }
+    .legend-line.a { border-color: var(--ai); }
+    .legend-line.l { border-top-style: dashed; }
+    .legend-line.p { border-top: 2px dotted #9b9ba1; }
+    .legend .gain-note, .legend .pending-note { display: inline; }
+
+    body.hide-gain .gain-note { display: none; }
+    body.focus-pending .step:not(:has(.pending-note)),
+    body.focus-pending .terminal:not(:has(small)) { opacity: .3; filter: grayscale(1); }
+    body.focus-pending .step:has(.pending-note) > .flow-node,
+    body.focus-pending .step:has(.pending-note) > .gate { outline: 3px solid rgba(36,88,214,.2); }
+
+    @media (max-width: 900px) {
+      .pain-map, .judge-strip { grid-template-columns: 1fr; }
+      .judge-box:not(:last-child)::after { content: "↓"; top: auto; bottom: -22px; right: 50%; transform: translateX(50%); }
+      .judge-strip { gap: 26px 0; row-gap: 28px; }
+    }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 22px, 1880px); padding-top: 20px; }
+      .hero { grid-template-columns: 1fr; }
+      .toolbar { justify-content: flex-start; }
+      .status-strip { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media print {
+      @page { size: A3 landscape; margin: 9mm; }
+      body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .shell { width: 100%; max-width: none; padding: 0; }
+      .hero { margin-bottom: 8px; }
+      .toolbar, .status-strip { display: none !important; }
+      h1 { font-size: 24px; }
+      .subtitle { margin-top: 4px; font-size: 10px; }
+      .board-wrap { overflow: visible; padding: 0; }
+      .process-board { min-width: 0; gap: 0 28px; }
+      .stage-head { min-height: 84px; padding: 10px 12px; }
+      .stage-title { font-size: 16px; }
+      .stage-desc { font-size: 9px; }
+      .stage-body { gap: 24px; padding: 12px 10px 18px; }
+      .flow-node { min-height: 70px; padding: 7px 9px; break-inside: avoid; box-shadow: none; }
+      .gate { min-height: 84px; }
+      .node-title { font-size: 10.5px; margin: 5px 4px; }
+      .gate-title { font-size: 10px; }
+      .node-tools, .node-notes { font-size: 8px; }
+      .pain-map, .judge-strip { break-inside: avoid; }
+      .legend { margin-top: 7px; padding: 6px 9px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">PCS ENGINEERING · TO-BE STRATEGY</p>
+        <h1 id="page-title">TO-BE 전략 Flow — 감시는 <b>Agent</b>, 기준은 엔지니어</h1>
+        <p class="subtitle">체계를 둘로 나눕니다. 상단 루프는 Agent가 24시간 수행하는 감시·판단 보조·실행(E2E)이고, 하단 루프는 엔지니어가 집중하는 기준 수립·진화입니다. 파란색은 Agent 수행, 검정은 사람 수행, ✓는 해소되는 AS-IS 문제점, ?는 현업 워크숍 확정 항목입니다.</p>
+        <p class="page-nav"><a href="엔지니어흐름_4단계_TASK플로우.html">← AS-IS 4단계 TASK Flow 보기</a></p>
+      </div>
+      <div class="toolbar" aria-label="보기 도구">
+        <button id="toggle-gain" type="button" aria-pressed="true">해소 표시</button>
+        <button id="focus-pending" type="button" aria-pressed="false">확정 필요 강조</button>
+        <button id="print-page" type="button">인쇄 / PDF</button>
+      </div>
+    </section>
+
+    <section class="status-strip" aria-label="전략 요약">
+      <div class="status-item"><i class="status-dot"></i><strong>2</strong><span>업무 루프 (감시 Agent · 기준 엔지니어)</span></div>
+      <div class="status-item ai"><i class="status-dot"></i><strong>13</strong><span>Agent 수행 스텝</span></div>
+      <div class="status-item"><i class="status-dot"></i><strong>1</strong><span>사람 승인 GATE</span></div>
+      <div class="status-item ai"><i class="status-dot"></i><strong>9</strong><span>판단 케이스 J-01~09</span></div>
+    </section>
+
+    <div class="board-wrap" aria-label="가로 스크롤 가능한 TO-BE 전략 흐름도">
+      <section class="process-board" id="process-board">
+        <svg class="connector-layer" id="connector-layer" aria-hidden="true">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b2b31"></path>
+            </marker>
+            <marker id="arrow-ai" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#2458d6"></path>
+            </marker>
+            <marker id="arrow-pending" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b9ba1"></path>
+            </marker>
+          </defs>
+        </svg>
+
+        <article class="stage" aria-labelledby="stage-1-title">
+          <header class="stage-head">
+            <span class="stage-kicker">LAYER 1 · DATA · 상시 수집</span>
+            <h2 class="stage-title" id="stage-1-title">데이터 통합</h2>
+            <p class="stage-desc">흩어진 시스템을 MCP로 묶어 Agent가 직접 읽는다. 데이터가 안 오는 설비까지 감지한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="step">
+              <section class="flow-node ai" id="a01">
+                <div class="node-top"><span class="task-no">A-01</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">데이터 열람 MCP 통합 수집</h3>
+                <div class="node-tools"><b>TECH</b>데이터 열람 MCP · Structured Query</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">시스템 교차 조회 제거</span><span class="pending-note">부서별 MCP 연동 협의</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node ai" id="a02">
+                <div class="node-top"><span class="task-no">A-02</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">사용량 정합 · 귀속 보정</h3>
+                <div class="node-tools"><b>TECH</b>Rule Engine (B3 바이패스 귀속 · D4 리셋)</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">조회·누적 수작업 제거</span><span class="pending-note">NOR/BYP 전환 이력 확보 (Q5)</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node ai" id="a03">
+                <div class="node-top"><span class="task-no">A-03</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">미수신 · 미등록 설비 감지</h3>
+                <div class="node-tools"><b>TECH</b>상시 스케줄 Agent</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">감시 사각지대 제거</span></p>
+            </div>
+
+            <div class="step">
+              <div class="terminal" id="ref-info">기준정보 로드 — Pair 관계 · 압력 측정지점 · 센서-구간 매핑 <small>※ Q2 · Q3 · Q6 확정 필요</small></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="stage" aria-labelledby="stage-2-title">
+          <header class="stage-head">
+            <span class="stage-kicker">LAYER 2 · MONITOR · 24H 전 설비</span>
+            <h2 class="stage-title" id="stage-2-title">상시 감시 · 분류</h2>
+            <p class="stage-desc">판단 입력 5차원(D1~D5)을 산출하고 J-매트릭스로 상태 5종을 자동 분류한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="step">
+              <section class="flow-node ai" id="a04">
+                <div class="node-top"><span class="task-no">A-04</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">D1~D5 판단 입력 산출</h3>
+                <div class="node-tools"><b>TECH</b>Rule Engine (사용률·압력·히팅·이력·레시피)</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">다중 Parameter 동시 확인 곤란 해소</span></p>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate ai" id="g10">
+                <div class="gate-inner">
+                  <span class="gate-no">G-10 · Agent 자동판정</span>
+                  <span class="gate-title">J-매트릭스 상태 분류</span>
+                  <span class="gate-tool">J-01~J-09 → 상태 5종</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="pending-note">경계값 P-01~08 = 가정값</span></p>
+            </div>
+
+            <div class="step">
+              <div class="terminal side" id="normal-end">정상 → 상태 기록 · 다음 주기 재평가</div>
+            </div>
+
+            <div class="step">
+              <section class="flow-node ai" id="a05">
+                <div class="node-top"><span class="task-no">A-05</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">우선순위 스코어링 · Pair 제약 적용</h3>
+                <div class="node-tools"><b>TECH</b>가점제 스코어링 · B4 동시점검 불가</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">점검 후보 선정 시간 단축</span></p>
+            </div>
+          </div>
+        </article>
+
+        <article class="stage" aria-labelledby="stage-3-title">
+          <header class="stage-head">
+            <span class="stage-kicker">LAYER 3 · DECIDE · CASE별</span>
+            <h2 class="stage-title" id="stage-3-title">판단 보조 · 승인</h2>
+            <p class="stage-desc">Agent가 근거를 정리해 제시하고, 엔지니어는 승인만 한다 — 사람 개입은 이 GATE 하나.</p>
+          </header>
+          <div class="stage-body">
+            <div class="parallel-grid">
+              <span class="parallel-label">CASE 발생 / 수시 질의 병렬</span>
+              <div class="step">
+                <section class="flow-node ai" id="a06">
+                  <div class="node-top"><span class="task-no">A-06</span><span class="actor ai">Agent</span></div>
+                  <h3 class="node-title">근거 카드 생성</h3>
+                  <div class="node-tools"><b>TECH</b>LLM · RAG (조건·상태·수치·구간·확인순서)</div>
+                </section>
+                <p class="node-notes"><span class="gain-note">3개 시스템 수동 정렬 해소</span><span class="guard-note">임시 기준임을 항상 명시</span></p>
+              </div>
+              <div class="step">
+                <section class="flow-node ai" id="a07">
+                  <div class="node-top"><span class="task-no">A-07</span><span class="actor ai">Agent</span></div>
+                  <h3 class="node-title">챗 자연어 질의응답</h3>
+                  <div class="node-tools"><b>TECH</b>LLM Intent → SQL</div>
+                </section>
+                <p class="node-notes"><span class="gain-note">챗 1회로 통합 조회</span></p>
+              </div>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g11">
+                <div class="gate-inner">
+                  <span class="gate-no">G-11 · 엔지니어</span>
+                  <span class="gate-title">점검 필요 최종 판단 · 승인</span>
+                  <span class="gate-tool">근거 카드 검토</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="guard-note">Agent는 단정하지 않음</span></p>
+            </div>
+
+            <div class="step">
+              <div class="terminal side" id="observe-end">불요 → 관찰 등록 (Agent가 자동 추적)</div>
+            </div>
+          </div>
+        </article>
+
+        <article class="stage" aria-labelledby="stage-4-title">
+          <header class="stage-head">
+            <span class="stage-kicker">LAYER 4 · ACT · 건별 + DAILY</span>
+            <h2 class="stage-title" id="stage-4-title">실행 · 리포트</h2>
+            <p class="stage-desc">작업요청 발행부터 결과 추적, Daily 리포트까지 Agent가 폐루프로 종결한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="step">
+              <section class="flow-node ai" id="a08">
+                <div class="node-top"><span class="task-no">A-08</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">작업요청 자동 발행</h3>
+                <div class="node-tools"><b>TECH</b>작업요청 MCP</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">작업요청 누락 0건</span><span class="gain-note">승인·발행 대기 해소</span><span class="guard-note">현행 EES SBO 자동발행 체계 계승·확장</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="a09">
+                <div class="node-top"><span class="task-no">A-09</span><span class="actor">협력사</span></div>
+                <h3 class="node-title">현장 조치 수행</h3>
+                <div class="node-tools"><b>TOOL</b>SOP</div>
+              </section>
+              <p class="node-notes"><span class="guard-note">현장 작업은 사람이 수행</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node ai" id="a10">
+                <div class="node-top"><span class="task-no">A-10</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">결과 회수 · 정상화 추적</h3>
+                <div class="node-tools"><b>TECH</b>Rule Engine (P-05 재상승 감시)</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">수기 입력·재첨부 해소</span><span class="pending-note">재상승 정의 P-05 확정</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node ai" id="a11">
+                <div class="node-top"><span class="task-no">A-11</span><span class="actor ai">Agent</span></div>
+                <h3 class="node-title">Daily 리포트 자동 발송</h3>
+                <div class="node-tools"><b>TECH</b>Knox MCP (사각지대 목록 포함)</div>
+              </section>
+              <p class="node-notes"><span class="gain-note">수기 보고 제거</span></p>
+            </div>
+          </div>
+        </article>
+
+        <div class="loop-band" id="loop-band">
+          <span class="loop-title">엔지니어 기준 루프 <small>— 피드백으로 기준이 진화한다 · 흐름은 우→좌</small></span>
+
+          <div class="step">
+            <section class="flow-node" id="l04">
+              <div class="node-top"><span class="task-no">L-04</span><span class="actor">엔지니어</span></div>
+              <h3 class="node-title">워크숍 기준 확정 · Rule 승격</h3>
+              <div class="node-tools"><b>OUT</b>가정값 P-xx → Rule R-xx</div>
+            </section>
+            <p class="node-notes"><span class="pending-note">워크숍 안건 Q1~Q8</span></p>
+          </div>
+
+          <div class="step">
+            <section class="flow-node ai" id="l03">
+              <div class="node-top"><span class="task-no">L-03</span><span class="actor ai">Agent</span></div>
+              <h3 class="node-title">기준 보정 후보 제안</h3>
+              <div class="node-tools"><b>TECH</b>파라미터 보정안 + 변경 전후 리포트</div>
+            </section>
+          </div>
+
+          <div class="step">
+            <section class="flow-node ai" id="l02">
+              <div class="node-top"><span class="task-no">L-02</span><span class="actor ai">Agent</span></div>
+              <h3 class="node-title">케이스별 적중률 집계</h3>
+              <div class="node-tools"><b>TECH</b>J-01~J-09 적중률 통계</div>
+            </section>
+          </div>
+
+          <div class="step">
+            <section class="flow-node" id="l01">
+              <div class="node-top"><span class="task-no">L-01</span><span class="actor">엔지니어</span></div>
+              <h3 class="node-title">점검 결과 피드백</h3>
+              <div class="node-tools"><b>IN</b>적중 · 오탐 · 미탐 입력</div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <h2 class="map-title">Pain Point → 극복 전략 매핑</h2>
+    <section class="pain-map" aria-label="AS-IS 문제와 TO-BE 전략 매핑">
+      <div class="pain-card">
+        <p class="asis">데이터 분산 — 여러 시스템을 사람이 열어 조합</p>
+        <p class="arrow">↓</p>
+        <p class="tobe">MCP 통합 데이터층 + 챗 한 번에 조회</p>
+        <div class="tech-tags"><span class="tech-tag">데이터 열람 MCP</span><span class="tech-tag">NL→SQL</span></div>
+      </div>
+      <div class="pain-card">
+        <p class="asis">관리 기준 부재 — 감각·경험에 의존한 판단</p>
+        <p class="arrow">↓</p>
+        <p class="tobe">가정값(P) → 워크숍 → Rule(R) 승격, 기준을 "운영되는 Rule"로</p>
+        <div class="tech-tags"><span class="tech-tag">Rule Engine</span><span class="tech-tag">피드백 보정</span></div>
+      </div>
+      <div class="pain-card">
+        <p class="asis">공정별 기준 차이 — 단일 기준은 오탐·미탐</p>
+        <p class="arrow">↓</p>
+        <p class="tobe">그룹 내 상대 비교로 시작 → PRC그룹별 파라미터 분화</p>
+        <div class="tech-tags"><span class="tech-tag">그룹 프로파일</span><span class="tech-tag">상대 비교</span></div>
+      </div>
+      <div class="pain-card">
+        <p class="asis">경험 의존 판단 — 원인 추정이 사람 머릿속에만</p>
+        <p class="arrow">↓</p>
+        <p class="tobe">판단 케이스 명문화 (D1~D5 × J-01~09) + 근거 제시 표준화</p>
+        <div class="tech-tags"><span class="tech-tag">Rule Engine</span><span class="tech-tag">LLM · RAG</span></div>
+      </div>
+      <div class="pain-card">
+        <p class="asis">감시 사각지대 — 시스템 등록 설비만 알림</p>
+        <p class="arrow">↓</p>
+        <p class="tobe">미수신·미등록 설비 자동 식별, 전 설비 상시 감시</p>
+        <div class="tech-tags"><span class="tech-tag">상시 Agent</span><span class="tech-tag">작업요청 MCP</span></div>
+      </div>
+    </section>
+
+    <h2 class="map-title">Agent 판단 체계 — 무엇으로 어떻게 판단하는가</h2>
+    <section class="judge-strip" aria-label="판단 체계 요약">
+      <div class="judge-box">
+        <h3>입력 5차원 <small>D1~D5</small></h3>
+        <ul>
+          <li><b>D1</b>사용률 (추정 임계값 대비 %)</li>
+          <li><b>D2</b>Pressure 현재·추세·재상승</li>
+          <li><b>D3</b>히팅센서 정상범위 이탈</li>
+          <li><b>D4</b>작업 이력 · 리셋 경과</li>
+          <li><b>D5</b>peak 레시피 (가중 요인)</li>
+        </ul>
+      </div>
+      <div class="judge-box">
+        <h3>계통 판단축 <small>B1~B5</small></h3>
+        <ul>
+          <li><b>B1</b>구간 단위 점검 특정</li>
+          <li><b>B2</b>측정점 기준 상·하류 해석</li>
+          <li><b>B3</b>바이패스 사용량 귀속 보정</li>
+          <li><b>B4</b>Pair 동시 점검 불가 제약</li>
+          <li><b>B5</b>상위 Chamber 역추적</li>
+        </ul>
+      </div>
+      <div class="judge-box">
+        <h3>판단 케이스 <small>J-01~J-09</small></h3>
+        <ul>
+          <li><b>J-02</b>사용률·압력 동반 상승 → 점검 후보</li>
+          <li><b>J-04</b>사용률 낮은데 압력 높음 → Sensor Port 의심</li>
+          <li><b>J-05</b>작업 후 재상승 → 원인 확인</li>
+          <li><b>J-09</b>복합·반복 → 우선 점검</li>
+          <li>… 총 9종 — 아래 상세표</li>
+        </ul>
+      </div>
+      <div class="judge-box">
+        <h3>상태 분류 <small>5종</small></h3>
+        <div class="state-badges">
+          <span class="state-badge">정상</span>
+          <span class="state-badge">관찰 필요</span>
+          <span class="state-badge">점검 후보</span>
+          <span class="state-badge">원인 확인 필요</span>
+          <span class="state-badge hot">우선 점검 후보</span>
+        </div>
+      </div>
+      <div class="judge-box">
+        <h3>근거 제시 <small>7항목</small></h3>
+        <ul>
+          <li>조회 조건 · 기준 시점</li>
+          <li>상태 + 판단 케이스</li>
+          <li>근거 수치 (임시 기준 명시)</li>
+          <li>점검 대상 구간 (B1)</li>
+          <li>추가 확인 순서 · 제약</li>
+        </ul>
+      </div>
+    </section>
+
+    <h2 class="map-title">J-매트릭스 상세 — 판단 케이스 9종 (D1~D5 × B1~B5)</h2>
+    <div class="j-table-wrap" role="region" aria-label="판단 케이스 매트릭스 상세표" tabindex="0">
+      <table class="j-table">
+        <thead>
+          <tr><th>ID</th><th>조건 조합</th><th>상태 분류</th><th>해석 · 원인 후보</th><th>점검 대상 구간 (B1)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><span class="j-id">J-01</span></td><td><p class="j-cond">Gas 사용률이 추정 임계값 가까이 누적됐지만, 압력은 아직 정상 범위를 유지하는 경우</p><span class="j-formula"><b>D1</b> 높음 + <b>D2</b> 정상</span></td><td><span class="state-badge">관찰 필요</span></td><td>교체주기 임박, 예방관리 후보</td><td>(점검 아닌 관찰) 교체·클리닝 일정 검토</td></tr>
+          <tr><td><span class="j-id">J-02</span></td><td><p class="j-cond">사용률이 높은 상태에서 압력도 상압 대비 높거나 상승 추세이고, 히팅센서는 정상인 경우 — 사용량으로 설명되는 전형적인 파우더 누적 신호</p><span class="j-formula"><b>D1</b> 높음 + <b>D2</b> 높음·상승 + <b>D3</b> 정상</span></td><td><span class="state-badge">점검 후보</span></td><td>파우더 누적 가능성</td><td>SD1, MERGE 합류부, NOR밸브 (측정점 확정 시 B2로 좁힘)</td></tr>
+          <tr><td><span class="j-id">J-03</span></td><td><p class="j-cond">사용률이 낮아 누적으로는 설명되지 않는데 압력이 높고, 히팅센서 온도가 정상범위 아래로 이탈해 있는 경우 — 가스가 식은 구간의 국부 파우더 생성 의심</p><span class="j-formula"><b>D1</b> 낮음 + <b>D2</b> 높음 + <b>D3</b> 이탈</span></td><td><span class="state-badge">원인 확인 필요</span></td><td>히팅 이탈 구간의 국부 파우더 생성 또는 Heating Jacket 자체 이상</td><td>D3 이탈 센서가 위치한 구간 우선</td></tr>
+          <tr><td><span class="j-id">J-04</span></td><td><p class="j-cond">클리닝·교체 작업 직후라 누적이 리셋됐고 히팅센서도 정상인데, 압력만 높게 유지되는 경우 — 실제 막힘보다 지시값 왜곡 가능성부터 확인</p><span class="j-formula"><b>D1</b> 낮음 + <b>D2</b> 높음 + <b>D3</b> 정상 + <b>D4</b> 작업 직후</span></td><td><span class="state-badge">원인 확인 필요</span></td><td>Sensor Port 막힘, 작업 범위 누락, 센서 이상</td><td>Sensor Port → 직전 작업 범위 순</td></tr>
+          <tr><td><span class="j-id">J-05</span></td><td><p class="j-cond">작업으로 내려갔던 압력이 기준 기간(P-05) 안에 작업 전 수준 가까이 다시 오르는 경우</p><span class="j-formula"><b>D4</b> 작업 후 <b>D2</b> 재상승 (P-05)</span></td><td><span class="state-badge">원인 확인 필요</span></td><td>작업 범위 누락, 센서·보조장치 문제, 급격한 파우더 재생성</td><td>직전 작업에서 제외된 구간부터</td></tr>
+          <tr><td><span class="j-id">J-06</span></td><td><p class="j-cond">누적 사용률은 중간 수준인데 압력이 상승 중이고, 순간(peak) 사용량이 큰 레시피를 쓰는 Chamber가 물려 있는 경우 — 총량보다 빠른 조기 파우더화 의심</p><span class="j-formula"><b>D1</b> 중간 + <b>D2</b> 상승 + <b>D5</b> peak 상위 레시피</span></td><td><span class="state-badge">점검 후보</span></td><td>순간 사용량에 의한 조기 파우더화 가능성</td><td>기여 상위 Chamber의 FORELINE (B5 역추적)</td></tr>
+          <tr><td><span class="j-id">J-07</span></td><td><p class="j-cond">Pair 상대 설비가 점검에 들어가 바이패스로 가동 중이라, 상대 몫의 가스까지 내 스크러버로 흘러 부하가 커져 있는 기간</p><span class="j-formula">Pair 상대 점검·BYP 가동 중</span></td><td><span class="state-badge">관찰 필요</span> <span class="state-none">(자동 승격)</span></td><td>바이패스로 부하 전가 중</td><td>자기 스크러버군 전체 (부하 증가 기간)</td></tr>
+          <tr><td><span class="j-id">J-08</span></td><td><p class="j-cond">바이패스 전환 이력이 있는데 상대 스크러버의 사용률이 급증한 경우 — 사용량이 엉뚱한 설비에 귀속됐을 수 있어 판단보다 보정이 먼저</p><span class="j-formula">BYP 전환 이력 + 상대 스크러버 <b>D1</b> 급증</span></td><td><span class="state-none">보정 후 재판단</span></td><td>사용량 귀속 오류 가능성 — 판단 전에 B3 귀속 보정 필요</td><td>—</td></tr>
+          <tr><td><span class="j-id">J-09</span></td><td><p class="j-cond">위 케이스(J-02~J-05) 중 2개 이상이 한 계통에서 동시에 성립하거나, 같은 스크러버군에서 기준 기간(P-08) 내 반복해서 발생하는 경우</p><span class="j-formula">J-02~J-05 중 2개 이상 동시 또는 반복 이슈 (P-08)</span></td><td><span class="state-badge hot">우선 점검 후보</span></td><td>복합 요인</td><td>해당 케이스들의 구간 합집합, 순서는 스코어 순</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="j-foot">※ J-08은 상태가 아니라 <b style="color:#3f3f46">판단 전 보정 단계</b>다 — 보정 없이 D1을 쓰면 J-01·J-02 오탐이 난다. 어떤 케이스에도 해당하지 않으면 "정상"으로 분류하되 D1·D2 수치는 항상 함께 보고한다. 조건의 높음·낮음 경계는 전부 가정값(P-01~P-08)이며 현업 워크숍으로 확정한다.</p>
+
+    <p class="guardrail"><b>가드레일</b> — Agent는 상태를 분류하고 근거를 제시할 뿐, 위험을 단정하거나 작업을 지시하지 않는다. 작업요청 자동 발행은 명확한 운영 기준 충족 시에만 수행하고, 모든 경계값은 가정값으로 시작해 현업 워크숍(Q1~Q8)으로만 확정한다. 최종 판단은 엔지니어가 수행한다.</p>
+
+    <footer class="legend">
+      <strong>범례</strong>
+      <span class="legend-item"><i class="legend-swatch ai"></i>Agent 수행 TASK</span>
+      <span class="legend-item"><i class="legend-swatch"></i>사람 수행 TASK</span>
+      <span class="legend-item"><i class="legend-diamond"></i>GATE · 판단/분기</span>
+      <span class="legend-item"><i class="legend-line a"></i>자동 경로</span>
+      <span class="legend-item"><i class="legend-line"></i>사람 개입 경로</span>
+      <span class="legend-item"><i class="legend-line l"></i>기준 루프 / 재분류 회귀</span>
+      <span class="legend-item"><i class="legend-line p"></i>확정 필요 경로</span>
+      <span class="legend-item"><span class="gain-note">해소되는 AS-IS 문제</span></span>
+      <span class="legend-item"><span class="pending-note">현업 확정 필요</span></span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const board = document.getElementById('process-board');
+      const svg = document.getElementById('connector-layer');
+      const NS = 'http://www.w3.org/2000/svg';
+      const stages = [...board.querySelectorAll('.stage')];
+      const SLOT = 9;      // 같은 통로 안에서 선 사이 간격
+      const LANE_Y = 18;   // 스테이지 하단과 기준 루프 밴드 사이 수평 채널
+
+      // shape:  v(수직) / elbow(ㄱ자 분기·합류) / jump(통로 경유 열 이동)
+      //         h(밴드 내 가로 직결) / lanevia(통로→하단 채널→통로 우회)
+      // kind :  ''(사람 개입, 검정) / auto(Agent 자동, 파랑) / loop(기준 루프, 검정 파선)
+      //         autoloop(자동 회귀, 파랑 파선) / pending(확정 필요, 회색 점선)
+      const connections = [
+        { from: 'a01', to: 'a02', kind: 'auto' },
+        { from: 'a02', to: 'a03', kind: 'auto' },
+        { from: 'a03', to: 'a04', shape: 'jump', corridor: 1, slot: -1, fromPort: 'right:0.5', toPort: 'left:0.3', kind: 'auto', label: '통합 데이터셋', labelSeg: 1, labelT: 0.4 },
+        { from: 'ref-info', to: 'a04', shape: 'jump', corridor: 1, slot: 1, fromPort: 'right:0.5', toPort: 'left:0.72', kind: 'pending', label: '기준정보*', labelSeg: 1, labelT: 0.25 },
+        { from: 'a04', to: 'g10', kind: 'auto', label: 'D1~D5' },
+        { from: 'g10', to: 'normal-end', shape: 'elbow', jogFrom: 'source', toPort: 'top:0.5', kind: 'auto', label: '정상', labelSeg: 1, labelT: 0.5 },
+        { from: 'g10', to: 'a05', shape: 'elbow', jogFrom: 'source', toPort: 'top:0.14', kind: 'auto', label: '이상 감지', labelSeg: 2, labelT: 0.45 },
+        { from: 'a05', to: 'a06', shape: 'jump', corridor: 2, slot: 0, fromPort: 'right:0.5', toPort: 'left:0.3', kind: 'auto', label: '점검 후보 + 근거 신호', labelSeg: 1, labelT: 0.45 },
+        { from: 'a06', to: 'g11', shape: 'elbow', jogFrom: 'target', toPort: 'top:0.5' },
+        { from: 'a07', to: 'g11', shape: 'elbow', jogFrom: 'target', toPort: 'top:0.5', label: '질의 결과', labelSeg: 1, labelT: 0.5 },
+        { from: 'g11', to: 'observe-end', shape: 'elbow', jogFrom: 'source', toPort: 'top:0.5', label: '불요', labelSeg: 1, labelT: 0.5 },
+        { from: 'g11', to: 'a08', shape: 'jump', corridor: 3, slot: -1, fromPort: 'right:0.5', toPort: 'left:0.35', label: '작업 필요 · 승인', labelSeg: 1, labelT: 0.6 },
+        { from: 'a08', to: 'a09', kind: 'auto', label: 'WO 전달' },
+        { from: 'a09', to: 'a10', kind: 'auto', label: '결과 자동 회수' },
+        { from: 'a10', to: 'a11', kind: 'auto', label: '정상 확인' },
+        { from: 'a10', to: 'g10', shape: 'lanevia', viaCorridor: 3, viaSlot: 0, corridor: 2, slot: 1, fromPort: 'left:0.3', toPort: 'right:0.5', kind: 'autoloop', label: '작업 후 재상승 → 재분류', labelSeg: 2, labelT: 0.5 },
+        { from: 'a10', to: 'l01', shape: 'jump', corridor: 3, slot: 1, fromPort: 'left:0.72', toPort: 'left:0.5', kind: 'loop', label: '점검 결과', labelSeg: 1, labelT: 0.72 },
+        { from: 'l01', to: 'l02', shape: 'h', kind: 'loop' },
+        { from: 'l02', to: 'l03', shape: 'h', kind: 'loop' },
+        { from: 'l03', to: 'l04', shape: 'h', kind: 'loop' },
+        { from: 'l04', to: 'g10', shape: 'jump', corridor: 1, slot: 0, fromPort: 'right:0.5', toPort: 'left:0.5', kind: 'loop', label: 'R-xx Rule 반영', labelSeg: 1, labelT: 0.42 }
+      ];
+
+      function port(el, spec = 'bottom:0.5') {
+        const b = board.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        const [side, fs] = spec.split(':');
+        const f = fs === undefined ? 0.5 : parseFloat(fs);
+        const x = r.left - b.left, y = r.top - b.top;
+        if (side === 'top') return [x + r.width * f, y];
+        if (side === 'bottom') return [x + r.width * f, y + r.height];
+        if (side === 'left') return [x, y + r.height * f];
+        return [x + r.width, y + r.height * f]; // right
+      }
+
+      // 위젯 + 아래 주석까지 포함한 블록의 하단 y (elbow 꺾음 위치용)
+      function blockBottom(el) {
+        const b = board.getBoundingClientRect();
+        const blk = el.closest('.step') || el;
+        return blk.getBoundingClientRect().bottom - b.top;
+      }
+
+      function corridorX(i) { // i번째 열과 i+1번째 열 사이 통로의 중심 x
+        const b = board.getBoundingClientRect();
+        return ((stages[i - 1].getBoundingClientRect().right + stages[i].getBoundingClientRect().left) / 2) - b.left;
+      }
+
+      function laneY() { // 스테이지 하단 ~ 밴드 사이 수평 채널
+        const b = board.getBoundingClientRect();
+        return (stages[0].getBoundingClientRect().bottom - b.top) + LANE_Y;
+      }
+
+      function buildPoints(c, fromEl, toEl) {
+        const b = board.getBoundingClientRect();
+        if (c.shape === 'jump') {
+          const [sx, sy] = port(fromEl, c.fromPort || 'right:0.5');
+          const [tx, ty] = port(toEl, c.toPort || 'left:0.5');
+          const cx = corridorX(c.corridor) + (c.slot || 0) * SLOT;
+          return [[sx, sy], [cx, sy], [cx, ty], [tx, ty]];
+        }
+        if (c.shape === 'elbow') {
+          const [sx, sy] = port(fromEl, c.fromPort || 'bottom:0.5');
+          const [tx, ty] = port(toEl, c.toPort || 'top:0.5');
+          const jy = c.jogFrom === 'target' ? ty - (c.jog || 15) : blockBottom(fromEl) + (c.jog || 15);
+          return [[sx, sy], [sx, jy], [tx, jy], [tx, ty]];
+        }
+        if (c.shape === 'h') {
+          const [sx, sy] = port(fromEl, c.fromPort || 'left:0.5');
+          const [tx, ty] = port(toEl, c.toPort || 'right:0.5');
+          return [[sx, sy], [tx, ty]];
+        }
+        if (c.shape === 'lanevia') {
+          const [sx, sy] = port(fromEl, c.fromPort);
+          const [tx, ty] = port(toEl, c.toPort);
+          const vx = corridorX(c.viaCorridor) + (c.viaSlot || 0) * SLOT;
+          const ly = laneY();
+          const cx = corridorX(c.corridor) + (c.slot || 0) * SLOT;
+          return [[sx, sy], [vx, sy], [vx, ly], [cx, ly], [cx, ty], [tx, ty]];
+        }
+        // v: 수직 하강
+        const [sx, sy] = port(fromEl, c.fromPort || 'bottom:0.5');
+        return [[sx, sy], [sx, toEl.getBoundingClientRect().top - b.top]];
+      }
+
+      function rounded(pts, r = 11) {
+        let d = `M ${pts[0][0]} ${pts[0][1]}`;
+        for (let i = 1; i < pts.length - 1; i++) {
+          const [px, py] = pts[i - 1], [cx, cy] = pts[i], [nx, ny] = pts[i + 1];
+          const inL = Math.hypot(cx - px, cy - py), outL = Math.hypot(nx - cx, ny - cy);
+          const ri = Math.min(r, inL / 2, outL / 2);
+          d += ` L ${cx - (cx - px) / inL * ri} ${cy - (cy - py) / inL * ri}`;
+          d += ` Q ${cx} ${cy} ${cx + (nx - cx) / outL * ri} ${cy + (ny - cy) / outL * ri}`;
+        }
+        d += ` L ${pts[pts.length - 1][0]} ${pts[pts.length - 1][1]}`;
+        return d;
+      }
+
+      function addLabel(x, y, text, kind) {
+        const group = document.createElementNS(NS, 'g');
+        group.setAttribute('class', `connector-label ${kind || ''}`);
+        const label = document.createElementNS(NS, 'text');
+        label.textContent = text;
+        label.setAttribute('x', x);
+        label.setAttribute('y', y);
+        group.appendChild(label);
+        svg.appendChild(group);
+        const box = label.getBBox();
+        const rect = document.createElementNS(NS, 'rect');
+        rect.setAttribute('x', box.x - 6);
+        rect.setAttribute('y', box.y - 3);
+        rect.setAttribute('width', box.width + 12);
+        rect.setAttribute('height', box.height + 6);
+        group.insertBefore(rect, label);
+      }
+
+      function draw() {
+        svg.querySelectorAll('.connector-path, .connector-casing, .connector-label').forEach(el => el.remove());
+        svg.setAttribute('viewBox', `0 0 ${board.clientWidth} ${board.clientHeight}`);
+
+        const labels = [];
+        connections.forEach(c => {
+          const fromEl = document.getElementById(c.from);
+          const toEl = document.getElementById(c.to);
+          if (!fromEl || !toEl) return;
+
+          const pts = buildPoints(c, fromEl, toEl);
+          const d = rounded(pts);
+
+          const casing = document.createElementNS(NS, 'path');
+          casing.setAttribute('d', d);
+          casing.setAttribute('class', 'connector-casing');
+          svg.appendChild(casing);
+
+          const path = document.createElementNS(NS, 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('class', `connector-path ${c.kind || ''}`);
+          svg.appendChild(path);
+
+          if (c.label) {
+            const seg = Math.min(c.labelSeg || 0, pts.length - 2);
+            const t = c.labelT === undefined ? 0.5 : c.labelT;
+            const a = pts[seg], e = pts[seg + 1];
+            labels.push([a[0] + (e[0] - a[0]) * t + (c.labelDx || 0), a[1] + (e[1] - a[1]) * t + (c.labelDy || 0), c.label, c.kind]);
+          }
+        });
+        labels.forEach(l => addLabel(...l)); // 라벨은 항상 선 위에 오도록 마지막에
+      }
+
+      const redraw = () => requestAnimationFrame(() => requestAnimationFrame(draw));
+      window.addEventListener('load', redraw);
+      window.addEventListener('resize', redraw);
+      document.fonts?.ready.then(redraw);
+
+      const gainBtn = document.getElementById('toggle-gain');
+      gainBtn.addEventListener('click', () => {
+        const hiding = document.body.classList.toggle('hide-gain');
+        gainBtn.setAttribute('aria-pressed', String(!hiding));
+        redraw();
+      });
+
+      const pendingBtn = document.getElementById('focus-pending');
+      pendingBtn.addEventListener('click', () => {
+        const focusing = document.body.classList.toggle('focus-pending');
+        pendingBtn.setAttribute('aria-pressed', String(focusing));
+      });
+
+      document.getElementById('print-page').addEventListener('click', () => window.print());
+      window.addEventListener('beforeprint', draw);
+    })();
+  </script>
+</body>
+</html>

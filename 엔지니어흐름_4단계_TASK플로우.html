@@ -1,0 +1,1158 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PCS 엔지니어 업무 4단계 TASK Flow</title>
+  <style>
+    :root {
+      --bg: #f4f4f5;
+      --ink: #1c1c21;
+      --muted: #63636b;
+      --line: #2b2b31;
+      --border: #d4d4d8;
+      --border-soft: #e4e4e7;
+      --pain: #c22a2a;
+      --pending: #71717a;
+      --shadow: 0 8px 22px rgba(24, 24, 28, 0.06);
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+      line-height: 1.5;
+    }
+
+    button { font: inherit; }
+
+    .shell {
+      width: min(1880px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      margin: 0 0 7px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(26px, 2.2vw, 38px);
+      line-height: 1.18;
+      letter-spacing: -.035em;
+    }
+
+    .subtitle {
+      max-width: 980px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .page-nav { margin: 10px 0 0; font-size: 12px; }
+    .page-nav a {
+      color: #3f3f46;
+      font-weight: 800;
+      text-decoration: none;
+      border-bottom: 1.5px solid #3f3f46;
+      padding-bottom: 1px;
+    }
+    .page-nav a:hover { color: #2458d6; border-color: #2458d6; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    .toolbar button {
+      min-height: 38px;
+      padding: 8px 13px;
+      color: #3f3f46;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      cursor: pointer;
+    }
+
+    .toolbar button:hover { border-color: #a1a1aa; }
+    .toolbar button[aria-pressed="true"] { color: #fff; background: #26262b; border-color: #26262b; }
+
+    .status-strip {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 52px;
+      padding: 10px 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .status-item strong { font-size: 19px; }
+    .status-item span { color: var(--muted); font-size: 12px; }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      background: #52525b;
+    }
+
+    .board-wrap {
+      overflow-x: auto;
+      padding: 2px 2px 12px;
+      scrollbar-color: #a1a1aa transparent;
+    }
+
+    /* 열 사이 44px gap = 연결선 통로(corridor), 하단 padding = 회귀 레인 */
+    .process-board {
+      position: relative;
+      isolation: isolate;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(330px, 1fr));
+      gap: 44px;
+      min-width: 1460px;
+      padding: 0 0 150px;
+    }
+
+    .connector-layer {
+      position: absolute;
+      inset: 0;
+      z-index: 3;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .connector-casing {
+      fill: none;
+      stroke: #fff;
+      stroke-width: 6;
+      opacity: .92;
+    }
+
+    .connector-path {
+      fill: none;
+      stroke: var(--line);
+      stroke-width: 2;
+      marker-end: url(#arrow);
+    }
+
+    .connector-path.feedback { stroke-dasharray: 8 5; }
+    .connector-path.pending { stroke: #9b9ba1; stroke-dasharray: 2 4; stroke-linecap: round; marker-end: url(#arrow-pending); }
+
+    .connector-label rect {
+      fill: #fff;
+      stroke: #c9c9cf;
+      rx: 6;
+      ry: 6;
+    }
+
+    .connector-label text {
+      fill: var(--line);
+      font-size: 11px;
+      font-weight: 800;
+      text-anchor: middle;
+      dominant-baseline: central;
+    }
+
+    .connector-label.pending text { fill: var(--pending); }
+
+    .stage {
+      position: relative;
+      z-index: 2;
+      min-height: 100%;
+      overflow: hidden;
+      background: #fdfdfd;
+      border: 1px solid var(--border);
+      border-top: 3px solid #26262b;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .stage-head {
+      position: relative;
+      z-index: 4;
+      min-height: 96px;
+      padding: 14px 16px 12px;
+      background: #f7f7f8;
+      border-bottom: 1px solid var(--border-soft);
+    }
+
+    .stage-kicker {
+      display: inline-flex;
+      margin-bottom: 6px;
+      padding: 2px 8px;
+      color: var(--muted);
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    .stage-title {
+      margin: 0;
+      font-size: 20px;
+      line-height: 1.2;
+      letter-spacing: -.025em;
+    }
+
+    .stage-desc {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: 11.5px;
+    }
+
+    .stage-body {
+      position: relative;
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      padding: 18px 15px 26px;
+    }
+
+    .step { position: relative; z-index: 5; }
+
+    /* TASK 카드: 좌상단 번호+주체 / 중앙 명칭 / 하단 사용툴 */
+    .flow-node {
+      display: flex;
+      flex-direction: column;
+      min-height: 96px;
+      padding: 10px 12px 9px;
+      background: #fff;
+      border: 1.5px solid #3f3f46;
+      border-radius: 11px;
+      box-shadow: 0 4px 12px rgba(24,24,28,.05);
+    }
+
+    .step { display: flex; flex-direction: column; }
+    .step > .flow-node { flex: 1 1 auto; }
+
+    .node-top {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .task-no {
+      display: inline-flex;
+      align-items: center;
+      padding: 1px 8px;
+      border: 1.5px solid #26262b;
+      border-radius: 6px;
+      font-size: 10.5px;
+      font-weight: 900;
+      letter-spacing: .02em;
+    }
+
+    .actor {
+      padding: 2px 7px;
+      color: #3f3f46;
+      background: #f4f4f5;
+      border-radius: 5px;
+      font-size: 10px;
+      font-weight: 800;
+    }
+
+    .node-title {
+      margin: 7px 6px;
+      font-size: 13.5px;
+      font-weight: 850;
+      line-height: 1.32;
+      letter-spacing: -.015em;
+      text-align: center;
+      word-break: keep-all;
+    }
+
+    .node-tools {
+      margin-top: auto;
+      padding-top: 6px;
+      border-top: 1px dashed var(--border-soft);
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .node-tools b {
+      margin-right: 6px;
+      color: #9b9ba1;
+      font-size: 8.5px;
+      font-weight: 900;
+      letter-spacing: .1em;
+    }
+
+    /* GATE: 마름모 판단 위젯 */
+    .gate {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      place-items: center;
+      min-height: 106px;
+      background: #26262b;
+      clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    }
+
+    .gate::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      background: #fff;
+      clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+    }
+
+    .gate-inner {
+      position: relative;
+      display: grid;
+      gap: 3px;
+      justify-items: center;
+      width: 62%;
+      text-align: center;
+    }
+
+    .gate-no {
+      color: var(--muted);
+      font-size: 9.5px;
+      font-weight: 900;
+      letter-spacing: .05em;
+    }
+
+    .gate-title {
+      font-size: 12.5px;
+      font-weight: 850;
+      line-height: 1.25;
+      letter-spacing: -.015em;
+      word-break: keep-all;
+    }
+
+    .gate-tool { color: var(--muted); font-size: 9.5px; font-weight: 700; }
+
+    /* 문제점·확인 필요: 위젯 밖 주석 */
+    .node-notes {
+      margin: 5px 2px 0 auto;
+      max-width: 44%;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.5;
+      text-align: right;
+      word-break: keep-all;
+    }
+
+    .gate-step { position: relative; }
+    .gate-step > .node-notes {
+      position: absolute;
+      top: 0;
+      right: 2px;
+      margin: 0;
+      max-width: 32%;
+      z-index: 6;
+    }
+
+    .pain-note { display: block; color: var(--pain); font-size: 10.5px; }
+    .pain-note::before { content: "! "; font-weight: 900; }
+    .pending-note { display: block; color: var(--pending); }
+    .pending-note::before { content: "? "; font-weight: 900; }
+
+    /* 불합리 유형 코드 (P1~P10) — 하단 Pain Point 정리와 연결 */
+    .p-tag {
+      margin-left: 3px;
+      color: #cf8383;
+      font-size: 9px;
+      font-style: normal;
+      font-weight: 900;
+    }
+
+    .parallel-grid {
+      position: relative;
+      z-index: 5;
+      display: grid;
+      grid-template-columns: 1.15fr .85fr;
+      gap: 9px;
+    }
+
+    .parallel-label {
+      position: absolute;
+      top: -13px;
+      right: 6px;
+      color: var(--muted);
+      background: #fdfdfd;
+      font-size: 9px;
+      font-weight: 800;
+    }
+
+    .terminal {
+      position: relative;
+      z-index: 5;
+      min-height: 46px;
+      padding: 9px 11px;
+      color: #3f3f46;
+      background: #fafafa;
+      border: 1.5px dashed #a1a1aa;
+      border-radius: 11px;
+      font-size: 11px;
+      font-weight: 800;
+      text-align: center;
+    }
+
+    .terminal small { color: var(--pending); font-weight: 700; }
+
+    /* 분기 종착 박스: 오른쪽으로 붙여 왼쪽에 본류 통과 레인을 남긴다 */
+    .terminal.side { width: 71%; margin-left: auto; }
+
+    .branch-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    /* Pain Point 정리: 보드의 ! 주석 취합 */
+    .map-title { margin: 26px 0 10px; font-size: 16px; letter-spacing: -.02em; }
+
+    .pain-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .pain-group {
+      padding: 12px 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--pain);
+      border-radius: 12px;
+      break-inside: avoid;
+    }
+
+    .pain-group header {
+      display: flex;
+      align-items: baseline;
+      gap: 7px;
+      margin-bottom: 7px;
+    }
+
+    .pain-group h3 { margin: 0; font-size: 12.5px; letter-spacing: -.01em; }
+    .pain-code { color: var(--pending); font-size: 9.5px; font-weight: 800; }
+    .pain-count { margin-left: auto; color: var(--pain); font-size: 10px; font-weight: 900; }
+
+    .pain-group ul {
+      display: grid;
+      gap: 4px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      color: var(--pain);
+      font-size: 10.5px;
+      font-weight: 700;
+      word-break: keep-all;
+    }
+
+    .pain-group li b {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 0 5px;
+      color: var(--ink);
+      background: #f4f4f5;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 900;
+    }
+
+    .pain-foot { margin: 8px 2px 0; color: var(--muted); font-size: 10.5px; }
+    .pain-foot a { color: #3f3f46; font-weight: 800; text-decoration: none; border-bottom: 1.5px solid #3f3f46; }
+    .pain-foot a:hover { color: #2458d6; border-color: #2458d6; }
+
+    body.hide-pain .map-title,
+    body.hide-pain .pain-summary,
+    body.hide-pain .pain-foot { display: none; }
+
+    .branch-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+      min-height: 62px;
+      padding: 11px 14px;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .branch-no {
+      display: grid;
+      place-items: center;
+      width: 29px;
+      height: 29px;
+      color: #fff;
+      background: #3f3f46;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .branch-card strong { display: block; font-size: 12px; }
+    .branch-card span { display: block; margin-top: 2px; color: var(--muted); font-size: 10px; }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: center;
+      margin-top: 14px;
+      padding: 12px 15px;
+      color: #52525b;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-size: 10px;
+    }
+
+    .legend strong { color: var(--ink); }
+    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 23px; height: 13px; background: #fff; border: 1.5px solid #3f3f46; border-radius: 3px; }
+    .legend-diamond { width: 11px; height: 11px; margin: 0 5px; background: #fff; border: 1.5px solid #26262b; transform: rotate(45deg); }
+    .legend-line { width: 27px; border-top: 2px solid var(--line); }
+    .legend-line.f { border-top-style: dashed; }
+    .legend-line.p { border-top: 2px dotted #9b9ba1; }
+    .legend .pain-note, .legend .pending-note { display: inline; }
+
+    body.hide-pain .pain-note { display: none; }
+    body.focus-pending .step:not(:has(.pending-note)),
+    body.focus-pending .terminal:not(.pending-terminal) { opacity: .3; filter: grayscale(1); }
+    body.focus-pending .step:has(.pending-note) > .flow-node,
+    body.focus-pending .step:has(.pending-note) > .gate { outline: 3px solid rgba(38,38,43,.18); }
+
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 22px, 1880px); padding-top: 20px; }
+      .hero { grid-template-columns: 1fr; }
+      .toolbar { justify-content: flex-start; }
+      .status-strip { grid-template-columns: repeat(2, 1fr); }
+      .branch-summary { grid-template-columns: 1fr; }
+      .pain-summary { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      @page { size: A3 landscape; margin: 9mm; }
+      body { background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .shell { width: 100%; max-width: none; padding: 0; }
+      .hero { margin-bottom: 8px; }
+      .toolbar, .status-strip, .branch-summary { display: none !important; }
+      h1 { font-size: 24px; }
+      .subtitle { margin-top: 4px; font-size: 10px; }
+      .board-wrap { overflow: visible; padding: 0; }
+      .process-board { min-width: 0; gap: 28px; padding-bottom: 144px; }
+      .stage-head { min-height: 80px; padding: 10px 12px; }
+      .stage-title { font-size: 16px; }
+      .stage-desc { font-size: 9px; }
+      .stage-body { gap: 24px; padding: 12px 10px 18px; }
+      .flow-node { min-height: 74px; padding: 7px 9px; break-inside: avoid; box-shadow: none; }
+      .gate { min-height: 84px; }
+      .node-title { font-size: 10.5px; margin: 5px 4px; }
+      .gate-title { font-size: 10px; }
+      .node-tools, .node-notes { font-size: 8px; }
+      .legend { margin-top: 7px; padding: 6px 9px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">PCS ENGINEERING · AS-IS PROCEDURE</p>
+        <h1 id="page-title">엔지니어 업무 4단계 TASK Flow</h1>
+        <p class="subtitle">사각형은 실행 TASK(번호·수행주체 / 명칭 / 사용툴), 마름모는 판단 GATE입니다. 위젯 밖 빨간 글씨(!)는 현재 프로세스의 문제점, 회색 글씨(?)는 현업 확인이 필요한 항목입니다. 점선은 회귀 루프, 점점선은 확인 필요 경로입니다.</p>
+        <p class="page-nav"><a href="엔지니어흐름_TOBE_전략플로우.html">TO-BE 전략 Flow 보기 →</a></p>
+      </div>
+      <div class="toolbar" aria-label="보기 도구">
+        <button id="toggle-pain" type="button" aria-pressed="true">문제점 표시</button>
+        <button id="focus-pending" type="button" aria-pressed="false">확인 필요 강조</button>
+        <button id="print-page" type="button">인쇄 / PDF</button>
+      </div>
+    </section>
+
+    <section class="status-strip" aria-label="흐름 요약">
+      <div class="status-item"><i class="status-dot"></i><strong>4</strong><span>업무 스테이지</span></div>
+      <div class="status-item"><i class="status-dot"></i><strong>16</strong><span>실행 TASK</span></div>
+      <div class="status-item"><i class="status-dot"></i><strong>6</strong><span>판단 GATE</span></div>
+      <div class="status-item"><i class="status-dot"></i><strong>2</strong><span>회귀·피드백 Loop</span></div>
+    </section>
+
+    <div class="board-wrap" aria-label="가로 스크롤 가능한 4단계 업무 흐름도">
+      <section class="process-board" id="process-board">
+        <svg class="connector-layer" id="connector-layer" aria-hidden="true">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b2b31"></path>
+            </marker>
+            <marker id="arrow-pending" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#9b9ba1"></path>
+            </marker>
+          </defs>
+        </svg>
+
+        <article class="stage" data-step="1" aria-labelledby="stage-1-title">
+          <header class="stage-head">
+            <span class="stage-kicker">STEP 1 · DESIGN TIME · 비정기</span>
+            <h2 class="stage-title" id="stage-1-title">기준 수립</h2>
+            <p class="stage-desc">감지 Parameter, Spec, TBM 주기와 SBO(System Based On) 자동 WO 발행 Rule을 정의한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="step">
+              <section class="flow-node" id="t01">
+                <div class="node-top"><span class="task-no">T-01</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">감지 Parameter · Spec 정의</h3>
+                <div class="node-tools"><b>TOOL</b>EES</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">전체 Spec 목록 미확보<i class="p-tag">P4</i></span><span class="pending-note">EMO 경로 확인</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t02">
+                <div class="node-top"><span class="task-no">T-02</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">고장 이력 분석 · TBM 주기 산정</h3>
+                <div class="node-tools"><b>TOOL</b>G-EMS · EES</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">시스템 교차 조회<i class="p-tag">P1</i></span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t03">
+                <div class="node-top"><span class="task-no">T-03</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">SBO 사전감지 로직 등록</h3>
+                <div class="node-tools"><b>TOOL</b>EES (SBO 로직)</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">등록·검증 절차 미확인<i class="p-tag">P4</i></span></p>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g00">
+                <div class="gate-inner">
+                  <span class="gate-no">G-00 · SYSTEM(EES)</span>
+                  <span class="gate-title">SBO 판정 · WO 자동 발행</span>
+                  <span class="gate-tool">EES · SBO 로직 → G-EMS</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="terminal pending-terminal side" id="tbm-trigger">TBM 주기 도래 → 운영 흐름 진입 <small>※ 발행 경로 확인 필요</small></div>
+          </div>
+        </article>
+
+        <article class="stage" data-step="2" aria-labelledby="stage-2-title">
+          <header class="stage-head">
+            <span class="stage-kicker">STEP 2 · RUN TIME · 상시 / DAILY</span>
+            <h2 class="stage-title" id="stage-2-title">감지 · 1차 확인</h2>
+            <p class="stage-desc">이벤트를 수취하고 현재 상태를 확인한 뒤 현장 점검 필요성을 1차 판정한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="parallel-grid">
+              <span class="parallel-label">상시 감시 / 정기 점검 병렬</span>
+              <div class="step">
+                <section class="flow-node" id="t04">
+                  <div class="node-top"><span class="task-no">T-04</span><span class="actor">협력사</span></div>
+                  <h3 class="node-title">Warning·Alarm 수신 / 자동 WO 수취</h3>
+                  <div class="node-tools"><b>TOOL</b>ACS 2.0 · EES · G-EMS</div>
+                </section>
+                <p class="node-notes"><span class="pain-note">다중 Parameter 동시 확인 곤란<i class="p-tag">P2</i></span><span class="pain-note">감시 대상 제한<i class="p-tag">P3</i></span></p>
+              </div>
+              <div class="step">
+                <section class="flow-node" id="t05">
+                  <div class="node-top"><span class="task-no">T-05</span><span class="actor">PCS감독관</span></div>
+                  <h3 class="node-title">Daily 체크리스트 점검</h3>
+                  <div class="node-tools"><b>TOOL</b>체크리스트</div>
+                </section>
+                <p class="node-notes"><span class="pain-note">현장·수기 기록<i class="p-tag">P6</i></span><span class="pending-note">이상 시 CASE 진입 확인</span></p>
+              </div>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g01">
+                <div class="gate-inner">
+                  <span class="gate-no">G-01 · 협력사</span>
+                  <span class="gate-title">Spec In 및 지속성 판정</span>
+                  <span class="gate-tool">EES</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="pending-note">빈도 기준 미정</span></p>
+            </div>
+
+            <div class="terminal side" id="observe-1">Spec In · 일시적 튐 → 관찰 등록 / 종료</div>
+
+            <div class="step">
+              <section class="flow-node" id="t06">
+                <div class="node-top"><span class="task-no">T-06</span><span class="actor">협력사</span></div>
+                <h3 class="node-title">Scrubber 설비 현장 점검</h3>
+                <div class="node-tools"><b>TOOL</b>육안 · 측정</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">현장 이동·측정<i class="p-tag">P8</i></span><span class="pain-note">결과 구조화 필요<i class="p-tag">P6</i></span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t07">
+                <div class="node-top"><span class="task-no">T-07</span><span class="actor">협력사</span></div>
+                <h3 class="node-title">계통 · 배관 구간 점검</h3>
+                <div class="node-tools"><b>TOOL</b>육안 · 측정</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">Alarm→구간 매핑 미정<i class="p-tag">P4</i></span><span class="pending-note">FORELINE 범위 확인</span></p>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g02">
+                <div class="gate-inner">
+                  <span class="gate-no">G-02 · 협력사</span>
+                  <span class="gate-title">협력사 작업 필요 여부 판정</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="pending-note">구분 기준 미정</span></p>
+            </div>
+          </div>
+        </article>
+
+        <article class="stage" data-step="3" aria-labelledby="stage-3-title">
+          <header class="stage-head">
+            <span class="stage-kicker">STEP 3 · EVENT TIME · CASE별</span>
+            <h2 class="stage-title" id="stage-3-title">종합 분석</h2>
+            <p class="stage-desc">여러 시스템의 Trend, 계통 위치, Gas 사용량과 생산 부하를 결합해 원인과 우선순위를 판단한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="step">
+              <section class="flow-node" id="t08">
+                <div class="node-top"><span class="task-no">T-08</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">연관 설비 Trend 종합 분석</h3>
+                <div class="node-tools"><b>TOOL</b>FDC · EES · iEES</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">3개 시스템 수동 정렬<i class="p-tag">P1</i></span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t09">
+                <div class="node-top"><span class="task-no">T-09</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">계통 위치 기반 영향도 분석</h3>
+                <div class="node-tools"><b>TOOL</b>배기 계통도</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">센서-계통 매핑 필요<i class="p-tag">P4</i></span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t10">
+                <div class="node-top"><span class="task-no">T-10</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">누적 Gas 사용량 분석</h3>
+                <div class="node-tools"><b>TOOL</b>G-EMS · EES-SMAS</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">조회·누적 수작업<i class="p-tag">P1</i></span></p>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g03">
+                <div class="gate-inner">
+                  <span class="gate-no">G-03 · PCS기술팀</span>
+                  <span class="gate-title">누적 사용량 기반 원인 진단</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="pending-note">정량 경계 미정</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t11">
+                <div class="node-top"><span class="task-no">T-11</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">생산량 · 가동률 분석</h3>
+                <div class="node-tools"><b>TOOL</b>TPSS</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">비교 그룹·부하 기준 미정<i class="p-tag">P4</i></span></p>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g04">
+                <div class="gate-inner">
+                  <span class="gate-no">G-04 · PCS기술팀</span>
+                  <span class="gate-title">작업 필요 · 우선순위 최종 판정</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="pending-note">가중치 미정</span></p>
+            </div>
+
+            <div class="terminal side" id="observe-2">작업 불요 → 관찰 등록</div>
+          </div>
+        </article>
+
+        <article class="stage" data-step="4" aria-labelledby="stage-4-title">
+          <header class="stage-head">
+            <span class="stage-kicker">STEP 4 · WORK ORDER · 건별 종결</span>
+            <h2 class="stage-title" id="stage-4-title">조치 · 검증</h2>
+            <p class="stage-desc">WO 발행부터 현장 조치, 결과 입력, 정상화 확인과 Rule 피드백까지 폐루프로 종결한다.</p>
+          </header>
+          <div class="stage-body">
+            <div class="step">
+              <section class="flow-node" id="t12">
+                <div class="node-top"><span class="task-no">T-12</span><span class="actor">Main기술팀</span></div>
+                <h3 class="node-title">현장 작업 WO 발행</h3>
+                <div class="node-tools"><b>TOOL</b>G-EMS</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">승인·발행 대기<i class="p-tag">P7</i></span><span class="pending-note">승인/발행 R&amp;R 확인</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t13">
+                <div class="node-top"><span class="task-no">T-13</span><span class="actor">협력사</span></div>
+                <h3 class="node-title">협력사 WO 수취</h3>
+                <div class="node-tools"><b>TOOL</b>G-EMS (자동 WO + 수동 WO)</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">이중 경로 통합 확인<i class="p-tag">P1</i></span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t14">
+                <div class="node-top"><span class="task-no">T-14</span><span class="actor">협력사</span></div>
+                <h3 class="node-title">현장 조치 작업 수행</h3>
+                <div class="node-tools"><b>TOOL</b>SOP</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">현장 인력 필수<i class="p-tag">P8</i></span><span class="pending-note">단순 조정 권한 확인</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t15">
+                <div class="node-top"><span class="task-no">T-15</span><span class="actor">협력사</span></div>
+                <h3 class="node-title">작업 결과 입력 · Qual</h3>
+                <div class="node-tools"><b>TOOL</b>G-EMS · EES</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">수기 입력·재첨부<i class="p-tag">P6</i></span></p>
+            </div>
+
+            <div class="step gate-step">
+              <div class="gate" id="g05">
+                <div class="gate-inner">
+                  <span class="gate-no">G-05 · PCS기술팀</span>
+                  <span class="gate-title">정상화 검증</span>
+                  <span class="gate-tool">EES</span>
+                </div>
+              </div>
+              <p class="node-notes"><span class="pending-note">관찰기간·반복상한 미정</span></p>
+            </div>
+
+            <div class="step">
+              <section class="flow-node" id="t16">
+                <div class="node-top"><span class="task-no">T-16</span><span class="actor">PCS기술팀</span></div>
+                <h3 class="node-title">WO Close · SBO 로직 튜닝</h3>
+                <div class="node-tools"><b>TOOL</b>G-EMS · EES(SBO 로직)</div>
+              </section>
+              <p class="node-notes"><span class="pain-note">피드백 구조 미정<i class="p-tag">P10</i></span></p>
+            </div>
+          </div>
+        </article>
+      </section>
+    </div>
+
+    <section class="branch-summary" aria-label="주요 분기 설명">
+      <div class="branch-card"><b class="branch-no">1</b><div><strong>1차 판정 분기 (G-01)</strong><span>Spec In·일시 튐은 관찰 종료, Spec Out·지속 이상은 현장 점검으로 이동</span></div></div>
+      <div class="branch-card"><b class="branch-no">2</b><div><strong>작업 분류 분기 (G-02)</strong><span>단순 조정은 조치 단계로, 정밀 작업은 PCS 종합 분석과 승인 후 WO로 이동</span></div></div>
+      <div class="branch-card"><b class="branch-no">3</b><div><strong>폐루프 분기 (G-05)</strong><span>검증 실패는 종합 분석으로 회귀하고, 성공 케이스는 SBO Rule 개선에 반영</span></div></div>
+    </section>
+
+    <h2 class="map-title">Pain Point 정리 — 보드의 문제점(!) 주석 18건 취합</h2>
+    <section class="pain-summary" aria-label="Pain Point 유형별 정리">
+      <div class="pain-group">
+        <header><h3>탐색 · 취합 부담</h3><span class="pain-code">P1 · P2</span><span class="pain-count">5건</span></header>
+        <ul>
+          <li><b>T-02</b>시스템 교차 조회 (G-EMS × EES)</li>
+          <li><b>T-08</b>3개 시스템 수동 정렬 (FDC · EES · iEES)</li>
+          <li><b>T-10</b>조회 · 누적 수작업 (G-EMS × SMAS)</li>
+          <li><b>T-04</b>다중 Parameter 동시 확인 곤란</li>
+          <li><b>T-13</b>이중 경로 통합 확인 (자동/수동 WO)</li>
+        </ul>
+      </div>
+      <div class="pain-group">
+        <header><h3>기준 · 기준정보 부재</h3><span class="pain-code">P4 · P5</span><span class="pain-count">5건</span></header>
+        <ul>
+          <li><b>T-01</b>전체 Spec 목록 미확보</li>
+          <li><b>T-03</b>등록 · 검증 절차 미확인</li>
+          <li><b>T-07</b>Alarm→구간 매핑 미정</li>
+          <li><b>T-09</b>센서-계통 매핑 필요</li>
+          <li><b>T-11</b>비교 그룹 · 부하 기준 미정</li>
+        </ul>
+      </div>
+      <div class="pain-group">
+        <header><h3>수기 기록 · 승인 대기</h3><span class="pain-code">P6 · P7</span><span class="pain-count">4건</span></header>
+        <ul>
+          <li><b>T-05</b>현장 · 수기 기록</li>
+          <li><b>T-06</b>점검 결과 구조화 필요</li>
+          <li><b>T-15</b>수기 입력 · 재첨부</li>
+          <li><b>T-12</b>승인 · 발행 대기</li>
+        </ul>
+      </div>
+      <div class="pain-group">
+        <header><h3>현장 물리 제약</h3><span class="pain-code">P8</span><span class="pain-count">2건</span></header>
+        <ul>
+          <li><b>T-06</b>현장 이동 · 측정</li>
+          <li><b>T-14</b>현장 인력 필수</li>
+        </ul>
+      </div>
+      <div class="pain-group">
+        <header><h3>감시 사각지대</h3><span class="pain-code">P3</span><span class="pain-count">1건</span></header>
+        <ul>
+          <li><b>T-04</b>감시 대상 제한 (등록 설비만 확인 가능)</li>
+        </ul>
+      </div>
+      <div class="pain-group">
+        <header><h3>피드백 미축적</h3><span class="pain-code">P10</span><span class="pain-count">1건</span></header>
+        <ul>
+          <li><b>T-16</b>피드백 구조 미정 (오탐 · 미탐 기록 부재)</li>
+        </ul>
+      </div>
+    </section>
+    <p class="pain-foot">유형 분류는 현황진단 보고의 불합리 코드(P1~P10)를 따르며, 각 항목은 위 보드의 빨간 주석과 1:1로 대응합니다. 유형별 해소 전략은 <a href="엔지니어흐름_TOBE_전략플로우.html">TO-BE 전략 Flow</a>의 Pain Point 매핑을 참조하세요.</p>
+
+    <footer class="legend">
+      <strong>범례</strong>
+      <span class="legend-item"><i class="legend-swatch"></i>TASK · 실행 활동</span>
+      <span class="legend-item"><i class="legend-diamond"></i>GATE · 판단/분기</span>
+      <span class="legend-item"><i class="legend-line"></i>정상 진행</span>
+      <span class="legend-item"><i class="legend-line f"></i>재분석·Rule 피드백 (하단 레인)</span>
+      <span class="legend-item"><i class="legend-line p"></i>현업 확인 필요 경로</span>
+      <span class="legend-item"><span class="pain-note">문제점</span></span>
+      <span class="legend-item"><span class="pending-note">현업 확인 필요</span></span>
+      <span class="legend-item"><i class="p-tag">P1~P10</i>불합리 유형 코드 (하단 Pain Point 정리 기준)</span>
+    </footer>
+  </main>
+
+  <script>
+    (() => {
+      const board = document.getElementById('process-board');
+      const svg = document.getElementById('connector-layer');
+      const NS = 'http://www.w3.org/2000/svg';
+      const stages = [...board.querySelectorAll('.stage')];
+      const SLOT = 9;        // 같은 통로 안에서 선 사이 간격
+      const LANE_TOP = 26;   // 스테이지 하단에서 첫 레인까지 거리
+      const LANE_STEP = 30;
+
+      // shape 종류
+      //  v      : 같은 열에서 아래로 수직 진행 (fromPort의 x 유지)
+      //  elbow  : ㄱ자 분기/합류 — jogFrom:'source'는 출발 직후, 'target'은 도착 직전에 꺾음
+      //  jump   : 옆 열로 이동 — 통로(corridor)로 나가 수직 이동 후 대상 옆면 진입
+      //  lane   : 아래로 내려가 하단 레인을 타고 이동 후 통로로 올라가 진입
+      //  lanevia: 옆으로 나가 통로를 타고 하단 레인까지 내려간 뒤 lane과 동일
+      const connections = [
+        { from: 't01', to: 't02' },
+        { from: 't02', to: 't03' },
+        { from: 't03', to: 'g00', label: 'Rule 활성화' },
+        { from: 'g00', to: 't04', shape: 'jump', corridor: 1, slot: -1, fromPort: 'right:0.5', toPort: 'left:0.3', label: '자동 WO (CBM·BM)', labelSeg: 1, labelT: 0.5 },
+        { from: 'g00', to: 't13', shape: 'dive', lane: 3, corridor: 3, slot: 1.5, dropAt: 0.13, kind: 'pending', label: '명확 케이스 → 조치 직행*', labelSeg: 3, labelT: 0.42 },
+        { from: 'tbm-trigger', to: 't04', shape: 'jump', corridor: 1, slot: 1, fromPort: 'right:0.5', toPort: 'left:0.72', kind: 'pending', label: 'TBM*', labelSeg: 1, labelT: 0.32 },
+        { from: 't04', to: 'g01', shape: 'elbow', jogFrom: 'target', toPort: 'top:0.5' },
+        { from: 't05', to: 'g01', shape: 'elbow', jogFrom: 'target', toPort: 'top:0.5', kind: 'pending', label: '이상 시*', labelSeg: 1, labelT: 0.5 },
+        { from: 'g01', to: 'observe-1', shape: 'elbow', jogFrom: 'source', toPort: 'top:0.5', label: 'IN · SPIKE', labelSeg: 1, labelT: 0.5 },
+        { from: 'g01', to: 't06', shape: 'elbow', jogFrom: 'source', toPort: 'top:0.14', label: 'OUT · TREND', labelSeg: 2, labelT: 0.5 },
+        { from: 't06', to: 't07' },
+        { from: 't07', to: 'g02' },
+        { from: 'g02', to: 't08', shape: 'jump', corridor: 2, slot: -1, fromPort: 'right:0.5', toPort: 'left:0.3', label: '정밀 작업', labelSeg: 1, labelT: 0.5 },
+        { from: 'g02', to: 't14', shape: 'lane', lane: 0, corridor: 3, slot: 0.5, fromPort: 'bottom:0.5', toPort: 'left:0.68', label: '단순 조정 직행', labelSeg: 1, labelT: 0.45 },
+        { from: 't08', to: 't09' },
+        { from: 't09', to: 't10' },
+        { from: 't10', to: 'g03' },
+        { from: 'g03', to: 't11' },
+        { from: 't11', to: 'g04' },
+        { from: 'g04', to: 'observe-2', shape: 'elbow', jogFrom: 'source', toPort: 'top:0.5', label: '작업 불요', labelSeg: 1, labelT: 0.5 },
+        { from: 'g04', to: 't12', shape: 'jump', corridor: 3, slot: -1.5, fromPort: 'right:0.5', toPort: 'left:0.35', label: '작업 필요 → WO', labelSeg: 1, labelT: 0.78 },
+        { from: 't12', to: 't13' },
+        { from: 't13', to: 't14' },
+        { from: 't14', to: 't15' },
+        { from: 't15', to: 'g05' },
+        { from: 'g05', to: 't16', label: '검증 통과' },
+        { from: 'g05', to: 't08', shape: 'lanevia', viaCorridor: 3, viaSlot: -0.5, lane: 1, corridor: 2, slot: 1, fromPort: 'left:0.5', toPort: 'left:0.62', kind: 'feedback', label: '검증 실패 · 재분석', labelSeg: 2, labelT: 0.5 },
+        { from: 't16', to: 't03', shape: 'lane', lane: 2, corridor: 1, slot: 0, fromPort: 'bottom:0.5', toPort: 'right:0.6', kind: 'feedback', label: 'Rule 피드백', labelSeg: 1, labelT: 0.55 }
+      ];
+
+      function port(el, spec = 'bottom:0.5') {
+        const b = board.getBoundingClientRect();
+        const r = el.getBoundingClientRect();
+        const [side, fs] = spec.split(':');
+        const f = fs === undefined ? 0.5 : parseFloat(fs);
+        const x = r.left - b.left, y = r.top - b.top;
+        if (side === 'top') return [x + r.width * f, y];
+        if (side === 'bottom') return [x + r.width * f, y + r.height];
+        if (side === 'left') return [x, y + r.height * f];
+        return [x + r.width, y + r.height * f]; // right
+      }
+
+      // 위젯 + 아래 주석까지 포함한 블록의 하단 y (elbow 꺾음 위치용)
+      function blockBottom(el) {
+        const b = board.getBoundingClientRect();
+        const blk = el.closest('.step') || el;
+        return blk.getBoundingClientRect().bottom - b.top;
+      }
+
+      function corridorX(i) { // i번째 열과 i+1번째 열 사이 통로의 중심 x
+        const b = board.getBoundingClientRect();
+        return ((stages[i - 1].getBoundingClientRect().right + stages[i].getBoundingClientRect().left) / 2) - b.left;
+      }
+
+      function laneY(i) {
+        const b = board.getBoundingClientRect();
+        return (stages[0].getBoundingClientRect().bottom - b.top) + LANE_TOP + i * LANE_STEP;
+      }
+
+      function buildPoints(c, fromEl, toEl) {
+        const b = board.getBoundingClientRect();
+        if (c.shape === 'jump') {
+          const [sx, sy] = port(fromEl, c.fromPort || 'right:0.5');
+          const [tx, ty] = port(toEl, c.toPort || 'left:0.5');
+          const cx = corridorX(c.corridor) + (c.slot || 0) * SLOT;
+          return [[sx, sy], [cx, sy], [cx, ty], [tx, ty]];
+        }
+        if (c.shape === 'elbow') {
+          const [sx, sy] = port(fromEl, c.fromPort || 'bottom:0.5');
+          const [tx, ty] = port(toEl, c.toPort || 'top:0.5');
+          const jy = c.jogFrom === 'target' ? ty - (c.jog || 15) : blockBottom(fromEl) + (c.jog || 15);
+          return [[sx, sy], [sx, jy], [tx, jy], [tx, ty]];
+        }
+        if (c.shape === 'lane') {
+          const [sx, sy] = port(fromEl, c.fromPort || 'bottom:0.5');
+          const [tx, ty] = port(toEl, c.toPort);
+          const ly = laneY(c.lane);
+          const cx = corridorX(c.corridor) + (c.slot || 0) * SLOT;
+          return [[sx, sy], [sx, ly], [cx, ly], [cx, ty], [tx, ty]];
+        }
+        if (c.shape === 'dive') { // 아래 꼭짓점 → 좌측 여백으로 jog → 하단 레인 → 통로 상승 → 옆면 진입
+          const [sx, sy] = port(fromEl, c.fromPort || 'bottom:0.5');
+          const [tx, ty] = port(toEl, c.toPort || 'left:0.5');
+          const fr = fromEl.getBoundingClientRect();
+          const dx = (fr.left - b.left) + fr.width * (c.dropAt || 0.13);
+          const jy = blockBottom(fromEl) + 15;
+          const ly = laneY(c.lane);
+          const cx = corridorX(c.corridor) + (c.slot || 0) * SLOT;
+          return [[sx, sy], [sx, jy], [dx, jy], [dx, ly], [cx, ly], [cx, ty], [tx, ty]];
+        }
+        if (c.shape === 'lanevia') {
+          const [sx, sy] = port(fromEl, c.fromPort);
+          const [tx, ty] = port(toEl, c.toPort);
+          const vx = corridorX(c.viaCorridor) + (c.viaSlot || 0) * SLOT;
+          const ly = laneY(c.lane);
+          const cx = corridorX(c.corridor) + (c.slot || 0) * SLOT;
+          return [[sx, sy], [vx, sy], [vx, ly], [cx, ly], [cx, ty], [tx, ty]];
+        }
+        // v: 수직 하강
+        const [sx, sy] = port(fromEl, c.fromPort || 'bottom:0.5');
+        return [[sx, sy], [sx, toEl.getBoundingClientRect().top - b.top]];
+      }
+
+      function rounded(pts, r = 11) {
+        let d = `M ${pts[0][0]} ${pts[0][1]}`;
+        for (let i = 1; i < pts.length - 1; i++) {
+          const [px, py] = pts[i - 1], [cx, cy] = pts[i], [nx, ny] = pts[i + 1];
+          const inL = Math.hypot(cx - px, cy - py), outL = Math.hypot(nx - cx, ny - cy);
+          const ri = Math.min(r, inL / 2, outL / 2);
+          d += ` L ${cx - (cx - px) / inL * ri} ${cy - (cy - py) / inL * ri}`;
+          d += ` Q ${cx} ${cy} ${cx + (nx - cx) / outL * ri} ${cy + (ny - cy) / outL * ri}`;
+        }
+        d += ` L ${pts[pts.length - 1][0]} ${pts[pts.length - 1][1]}`;
+        return d;
+      }
+
+      function addLabel(x, y, text, kind) {
+        const group = document.createElementNS(NS, 'g');
+        group.setAttribute('class', `connector-label ${kind || ''}`);
+        const label = document.createElementNS(NS, 'text');
+        label.textContent = text;
+        label.setAttribute('x', x);
+        label.setAttribute('y', y);
+        group.appendChild(label);
+        svg.appendChild(group);
+        const box = label.getBBox();
+        const rect = document.createElementNS(NS, 'rect');
+        rect.setAttribute('x', box.x - 6);
+        rect.setAttribute('y', box.y - 3);
+        rect.setAttribute('width', box.width + 12);
+        rect.setAttribute('height', box.height + 6);
+        group.insertBefore(rect, label);
+      }
+
+      function draw() {
+        svg.querySelectorAll('.connector-path, .connector-casing, .connector-label').forEach(el => el.remove());
+        svg.setAttribute('viewBox', `0 0 ${board.clientWidth} ${board.clientHeight}`);
+
+        const labels = [];
+        connections.forEach(c => {
+          const fromEl = document.getElementById(c.from);
+          const toEl = document.getElementById(c.to);
+          if (!fromEl || !toEl) return;
+
+          const pts = buildPoints(c, fromEl, toEl);
+          const d = rounded(pts);
+
+          const casing = document.createElementNS(NS, 'path');
+          casing.setAttribute('d', d);
+          casing.setAttribute('class', 'connector-casing');
+          svg.appendChild(casing);
+
+          const path = document.createElementNS(NS, 'path');
+          path.setAttribute('d', d);
+          path.setAttribute('class', `connector-path ${c.kind || ''}`);
+          svg.appendChild(path);
+
+          if (c.label) {
+            const seg = Math.min(c.labelSeg || 0, pts.length - 2);
+            const t = c.labelT === undefined ? 0.5 : c.labelT;
+            const a = pts[seg], e = pts[seg + 1];
+            labels.push([a[0] + (e[0] - a[0]) * t + (c.labelDx || 0), a[1] + (e[1] - a[1]) * t + (c.labelDy || 0), c.label, c.kind]);
+          }
+        });
+        labels.forEach(l => addLabel(...l)); // 라벨은 항상 선 위에 오도록 마지막에
+      }
+
+      const redraw = () => requestAnimationFrame(() => requestAnimationFrame(draw));
+      window.addEventListener('load', redraw);
+      window.addEventListener('resize', redraw);
+      document.fonts?.ready.then(redraw);
+
+      const painBtn = document.getElementById('toggle-pain');
+      painBtn.addEventListener('click', () => {
+        const hiding = document.body.classList.toggle('hide-pain');
+        painBtn.setAttribute('aria-pressed', String(!hiding));
+        redraw();
+      });
+
+      const pendingBtn = document.getElementById('focus-pending');
+      pendingBtn.addEventListener('click', () => {
+        const focusing = document.body.classList.toggle('focus-pending');
+        pendingBtn.setAttribute('aria-pressed', String(focusing));
+      });
+
+      document.getElementById('print-page').addEventListener('click', () => window.print());
+      window.addEventListener('beforeprint', draw);
+    })();
+  </script>
+</body>
+</html>
